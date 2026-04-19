@@ -181,6 +181,10 @@ function refreshSpots(eventId) {
   document.querySelectorAll(`[data-spots="${eventId}"]`).forEach(el => {
     el.innerHTML = `&#9998;${spotsLabel(e)}`;
   });
+  const full = isEventFull(e);
+  document.querySelectorAll(`.btn-inscrire[data-event-id="${eventId}"]`).forEach(btn => {
+    btn.disabled = full;
+  });
 }
 
 function spotsLabel(e) {
@@ -189,7 +193,15 @@ function spotsLabel(e) {
   if (!cap) return ' Inscription obligatoire';
   const taken = registrationCount(e.id);
   const left  = Math.max(0, cap - taken);
+  if (left === 0) return ' Complet';
   return ` Inscription obligatoire — ${left} place${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''}`;
+}
+
+function isEventFull(e) {
+  if (!e.inscription) return false;
+  const cap = parseInt(e.capacity, 10);
+  if (!cap) return false;
+  return registrationCount(e.id) >= cap;
 }
 
 function buildDateRangeDisplay(e, times) {
@@ -236,7 +248,7 @@ function buildFeaturedEventHTML(e) {
         ${e.inscription ? `<li data-spots="${escHtml(e.id)}">&#9998;${spotsLabel(e)}</li>` : ''}
       </ul>
       ${buildEventTablesHTML(e.id)}
-      ${e.inscription ? `<button class="btn btn-primary btn-inscrire" data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+      ${e.inscription ? `<button class="btn btn-primary btn-inscrire"${isEventFull(e) ? ' disabled' : ''} data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
     </div>
   </div>`;
 }
@@ -265,7 +277,7 @@ function buildTimelineEventHTML(e) {
         ${e.inscription ? `<span data-spots="${escHtml(e.id)}">&#9998;${spotsLabel(e)}</span>` : ''}
       </div>
       ${buildEventTablesHTML(e.id)}
-      ${e.inscription ? `<button class="btn btn-primary btn-sm btn-inscrire" style="margin-top:.8rem;" data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+      ${e.inscription ? `<button class="btn btn-primary btn-sm btn-inscrire" style="margin-top:.8rem;"${isEventFull(e) ? ' disabled' : ''} data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
     </div>
   </div>`;
 }

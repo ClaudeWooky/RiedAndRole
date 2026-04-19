@@ -780,8 +780,10 @@ function renderGames() {
   list.innerHTML = items.map(item => `
     <div class="admin-item">
       <div class="admin-item-info">
-        <div class="admin-item-title">${esc(item.icon)} ${esc(item.title)}</div>
-        <div class="admin-item-meta">${esc(catLabel[item.category] || item.category)}${item.popular ? ' · ★ Populaire' : ''}</div>
+        <div class="admin-item-title">${esc(item.icon)} ${esc(item.title)}${item.popular ? ' <span class="admin-item-badge badge-orange">★ Populaire</span>' : ''}</div>
+        <div class="admin-item-badges">
+          ${item.badges && item.badges.length ? item.badges.map(b => `<span class="admin-item-badge badge-slate">${esc(b)}</span>`).join('') : '<span class="admin-item-meta-empty">—</span>'}
+        </div>
         <div class="admin-item-badges">
           <span class="admin-item-badge badge-${esc(item.tagColor)}">${esc(item.tag)}</span>
         </div>
