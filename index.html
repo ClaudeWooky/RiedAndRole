@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ried &amp; Rôle — Association de Jeux de Rôle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════  HEADER  ═══════════════════════════ -->
+  <header id="site-header">
+    <div class="header-top">
+      <div class="container">
+        <div class="social-bar">
+          <a href="https://www.facebook.com/profile.php?id=61555805010547" target="_blank" rel="noopener" aria-label="Facebook">&#9632; Facebook</a>
+          <a href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" aria-label="Discord">&#9632; Discord</a>
+          <a href="https://www.instagram.com/riednrole/" target="_blank" rel="noopener" aria-label="Instagram">&#9632; Instagram</a>
+        </div>
+        <div class="header-right">
+          <div class="header-tagline">Association de Jeux de Rôle — Centre Alsace</div>
+          <a href="admin.html" class="admin-link" title="Administration">&#9881;</a>
+        </div>
+      </div>
+    </div>
+    <div class="header-main">
+      <div class="container">
+        <a href="#home" class="logo" data-target="home">
+          <span class="logo-icon">&#9670;</span>
+          <div class="logo-text">
+            <span class="logo-name">Ried &amp; Rôle</span>
+            <span class="logo-sub">Association de Jeux de Rôle</span>
+          </div>
+        </a>
+        <button class="nav-toggle" id="nav-toggle" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+        <nav id="main-nav">
+          <ul>
+            <li><a href="#home"         class="nav-link active" data-target="home">Home</a></li>
+            <li><a href="#jeux"         class="nav-link" data-target="jeux">Jeux de Rôles</a></li>
+            <li><a href="#evenements"   class="nav-link" data-target="evenements">Événements</a></li>
+            <li><a href="#blog"         class="nav-link" data-target="blog">Blog</a></li>
+            <li><a href="#equipe"       class="nav-link" data-target="equipe">L'Équipe</a></li>
+            <li><a href="#contacts"     class="nav-link" data-target="contacts">Contacts</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ═══════════════════════════  HOME  ═══════════════════════════ -->
+    <section id="home" class="page active">
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-particles" id="particles"></div>
+        <div class="hero-content">
+          <p class="hero-eyebrow">&#9670; Bienvenue dans l'univers de</p>
+          <h1 class="hero-title">Ried <span class="accent">&amp;</span> Rôle</h1>
+          <p class="hero-subtitle">L'association alsacienne qui vous plonge dans des aventures épiques.<br>Rejoignez-nous autour des tables de jeu !</p>
+          <div class="hero-buttons">
+            <a href="#jeux" class="btn btn-primary nav-link" data-target="jeux">Découvrir nos jeux</a>
+            <a href="#contacts" class="btn btn-outline nav-link" data-target="contacts">Nous rejoindre</a>
+          </div>
+        </div>
+        <div class="hero-scroll">
+          <span>Défiler</span>
+          <div class="scroll-arrow"></div>
+        </div>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="stats-bar">
+        <div class="container">
+          <div class="stat">
+            <span class="stat-number" id="stat-membres" data-target="42">30</span>
+            <span class="stat-label">Membres</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number" id="stat-parties" data-target="8">50</span>
+            <span class="stat-label">Parties pratiquées</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number" id="stat-evenements" data-target="15">10</span>
+            <span class="stat-label">Événements / an</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number" id="stat-annees" data-target="6">2</span>
+            <span class="stat-label">Années d'existence</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Featured games teaser -->
+      <div class="section-wrap">
+        <div class="container">
+          <div class="section-header">
+            <h2>Nos Univers <span class="accent">Favoris</span></h2>
+            <p>Des mondes fantastiques qui n'attendent que vous</p>
+          </div>
+          <div class="cards-grid" id="home-games-grid"></div>
+        </div>
+      </div>
+
+      <!-- Next event teaser -->
+      <div class="next-event-bar">
+        <div class="container">
+          <div class="next-event-label">&#9670; Prochain événement</div>
+          <div class="next-event-info">
+            <span class="next-event-date">Samedi 10 Mai 2026</span>
+            <span class="next-event-title">Convention Printanière — Ried &amp; Rôle 2026</span>
+          </div>
+          <a href="#evenements" class="btn btn-primary btn-sm nav-link" data-target="evenements">Voir le programme</a>
+        </div>
+      </div>
+
+      <!-- Latest blog posts teaser -->
+      <div class="section-wrap bg-dark">
+        <div class="container">
+          <div class="section-header">
+            <h2>Dernières <span class="accent">Nouvelles</span></h2>
+            <p>Restez informés de la vie de l'association</p>
+          </div>
+          <div id="home-blog-grid" class="blog-grid"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ═══════════════════════  JEUX DE RÔLES  ═══════════════════════ -->
+    <section id="jeux" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#0a0a1a 0%,#1a0a4a 50%,#0a0a1a 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Notre catalogue</p>
+          <h1>Jeux de <span class="accent">Rôles</span></h1>
+          <p>Des univers sans limites pour des aventures mémorables</p>
+        </div>
+      </div>
+
+      <div class="section-wrap">
+        <div class="container">
+
+          <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">Tous</button>
+            <button class="filter-btn" data-filter="fantasy">Fantasy</button>
+            <button class="filter-btn" data-filter="horreur">Horreur</button>
+            <button class="filter-btn" data-filter="scifi">Sci-Fi</button>
+            <button class="filter-btn" data-filter="historique">Historique</button>
+            <button class="filter-btn" data-filter="multivers">Multivers</button>
+            <button class="filter-btn" data-filter="cyberpunk">Cyberpunk</button>
+            <button class="filter-btn" data-filter="postapocalypse">Post-Apoc.</button>
+            <button class="filter-btn" data-filter="caricatural">Caricatural</button>
+            <button class="filter-btn" data-filter="contemporain">Contemporain</button>
+            <button class="filter-btn" data-filter="fantasyjap">Fantasy Jap.</button>
+            <button class="filter-btn" data-filter="superheros">Super-Héros</button>
+            <button class="filter-btn" data-filter="western">Western</button>
+            <button class="filter-btn" data-filter="generique">Générique</button>
+            <button class="filter-btn" data-filter="autre">Autre</button>
+            <button class="filter-btn" data-filter="pirates">Pirates</button>
+            <button class="filter-btn" data-filter="sciencefantasy">Sci-Fantasy</button>
+          </div>
+
+          <div class="games-list">
+            <div id="dynamic-games"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════  ÉVÉNEMENTS  ═══════════════════════ -->
+    <section id="evenements" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#0a1a0a 0%,#1a3a0a 50%,#0a1a0a 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Agenda 2026</p>
+          <h1>Nos <span class="accent">Événements</span></h1>
+          <p>Conventions, tournois et soirées jeux tout au long de l'année</p>
+        </div>
+      </div>
+
+      <div class="section-wrap">
+        <div class="container">
+
+          <div class="events-featured">
+            <div id="dynamic-featured-event"></div>
+            <div class="event-hero-card static-fallback">
+              <div class="ehc-date-block">
+                <span class="ehc-month">MAI</span>
+                <span class="ehc-day">10</span>
+                <span class="ehc-year">2026</span>
+              </div>
+              <div class="ehc-body">
+                <span class="tag tag-orange">&#9733; Événement phare</span>
+                <h2>Convention Printanière — Ried &amp; Rôle 2026</h2>
+                <p>Notre grand rendez-vous annuel de printemps ! Une journée entière dédiée au jeu de rôle avec des tables initiations, des tournois, des conférences de game designers et un marché de l'occasion.</p>
+                <ul class="event-details">
+                  <li>&#128205; Salle des fêtes de Rhinau, 2 Rue du Rhin, 67860 Rhinau</li>
+                  <li>&#128336; 10h00 – 22h00</li>
+                  <li>&#128179; Entrée libre pour les membres / 5€ pour les visiteurs</li>
+                  <li>&#128100; Capacité : 150 personnes</li>
+                </ul>
+                <button class="btn btn-primary btn-inscrire" data-event-id="static-spring-2026" data-event-title="Convention Printanière — Ried &amp; Rôle 2026">S'inscrire</button>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="sub-section-title">Prochains événements</h3>
+          <div class="events-timeline">
+            <div id="dynamic-events"></div>
+
+            <div class="event-item">
+              <div class="event-date-col">
+                <span class="ed-day">24</span>
+                <span class="ed-month">Mai</span>
+              </div>
+              <div class="event-connector">
+                <div class="ec-dot"></div>
+                <div class="ec-line"></div>
+              </div>
+              <div class="event-content">
+                <span class="tag tag-purple">Soirée thématique</span>
+                <h4>Nuit Lovecraftienne</h4>
+                <p>Soirée dédiée à l'horreur cosmique. Plusieurs tables en parallèle sur L'Appel de Cthulhu et Delta Green.</p>
+                <div class="event-meta">
+                  <span>&#128205; Local de l'association</span>
+                  <span>&#128336; 19h00 – 01h00</span>
+                  <span>&#128100; 20 places</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-date-col">
+                <span class="ed-day">14</span>
+                <span class="ed-month">Jun</span>
+              </div>
+              <div class="event-connector">
+                <div class="ec-dot"></div>
+                <div class="ec-line"></div>
+              </div>
+              <div class="event-content">
+                <span class="tag tag-green">Initiation</span>
+                <h4>Atelier Initiation JDR — Médiathèque de Sélestat</h4>
+                <p>Venez découvrir le jeu de rôle en famille ! Nos membres animent des sessions d'initiation adaptées à tous les âges dès 12 ans.</p>
+                <div class="event-meta">
+                  <span>&#128205; Médiathèque de Sélestat</span>
+                  <span>&#128336; 14h00 – 18h00</span>
+                  <span>&#128100; Entrée libre</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-date-col">
+                <span class="ed-day">05</span>
+                <span class="ed-month">Jul</span>
+              </div>
+              <div class="event-connector">
+                <div class="ec-dot"></div>
+                <div class="ec-line"></div>
+              </div>
+              <div class="event-content">
+                <span class="tag tag-red">Tournoi</span>
+                <h4>Tournoi D&amp;D One-Shot — Été 2026</h4>
+                <p>Compétition amicale en format one-shot. Les tables s'affrontent sur des défis communs, avec un jury de MJs expérimentés. Trophée et prix à gagner !</p>
+                <div class="event-meta">
+                  <span>&#128205; Local de l'association</span>
+                  <span>&#128336; 13h00 – 23h00</span>
+                  <span>&#128100; 24 places (inscription requise)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-date-col">
+                <span class="ed-day">19</span>
+                <span class="ed-month">Sep</span>
+              </div>
+              <div class="event-connector">
+                <div class="ec-dot"></div>
+                <div class="ec-line"></div>
+              </div>
+              <div class="event-content">
+                <span class="tag tag-blue">Rentrée</span>
+                <h4>Soirée de Rentrée 2026</h4>
+                <p>La grande soirée de reprise après l'été ! Présentation des nouvelles campagnes, inscription aux tables et buffet convivial offert par l'association.</p>
+                <div class="event-meta">
+                  <span>&#128205; Local de l'association</span>
+                  <span>&#128336; 18h00 – 23h00</span>
+                  <span>&#128100; Tous les membres</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-date-col">
+                <span class="ed-day">07</span>
+                <span class="ed-month">Nov</span>
+              </div>
+              <div class="event-connector">
+                <div class="ec-dot"></div>
+              </div>
+              <div class="event-content">
+                <span class="tag tag-orange">Festival</span>
+                <h4>Participation aux Ludopathiques de Strasbourg</h4>
+                <p>Ried &amp; Rôle sera présent au grand festival du jeu de Strasbourg avec deux stands d'initiation et une conférence sur l'histoire du JDR.</p>
+                <div class="event-meta">
+                  <span>&#128205; Palais des Congrès, Strasbourg</span>
+                  <span>&#128336; Tout le week-end</span>
+                  <span>&#128100; Grand public</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <h3 class="sub-section-title" id="past-events-title" hidden>Événements passés</h3>
+          <div class="events-timeline events-timeline--past" id="past-events"></div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════  BLOG  ═══════════════════════════ -->
+    <section id="blog" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#1a0a0a 0%,#3a0a1a 50%,#1a0a0a 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Nos articles</p>
+          <h1>Le <span class="accent">Blog</span></h1>
+          <p>Actualités, critiques et conseils du monde du JDR</p>
+        </div>
+      </div>
+
+      <div class="section-wrap">
+        <div class="container">
+
+          <div class="blog-layout">
+            <div class="blog-main" id="dynamic-blog"></div>
+
+            <aside class="blog-sidebar">
+              <div class="sidebar-widget">
+                <h4 class="widget-title">Catégories</h4>
+                <ul class="cat-list" id="dynamic-cat-list"></ul>
+              </div>
+              <div class="sidebar-widget">
+                <h4 class="widget-title">Articles récents</h4>
+                <ul class="recent-posts" id="dynamic-recent-posts"></ul>
+              </div>
+              <div class="sidebar-widget">
+                <h4 class="widget-title">Rejoindre l'asso</h4>
+                <p style="color:#aaa;font-size:0.9rem;margin-bottom:1rem;">Cotisation annuelle : 20€/adulte, 12€/étudiant</p>
+                <a href="#contacts" class="btn btn-primary btn-full nav-link" data-target="contacts">Nous rejoindre</a>
+              </div>
+            </aside>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════  L'ÉQUIPE  ═══════════════════════════ -->
+    <section id="equipe" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#0a0a1a 0%,#0a1a3a 50%,#0a0a1a 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Qui sommes-nous</p>
+          <h1>Notre <span class="accent">Équipe</span></h1>
+          <p>Des passionnés au service de la communauté JDR alsacienne</p>
+        </div>
+      </div>
+
+      <div class="section-wrap">
+        <div class="container">
+
+          <div class="section-header">
+            <h2>Le Bureau <span class="accent">Associatif</span></h2>
+            <p>L'équipe dirigeante élue lors de l'Assemblée Générale 2025</p>
+          </div>
+
+          <div class="team-grid">
+            <div id="dynamic-team-bureau" style="display:contents"></div>
+
+            <div id="static-bureau-cards" style="display:contents">
+            <div class="team-card president">
+              <div class="tc-avatar" style="background:linear-gradient(135deg,#1a0a2e,#4b1c7d);">
+                <span class="tc-initials">ML</span>
+                <div class="tc-badges-wrap"><div class="tc-role-badge">Président</div></div>
+              </div>
+              <div class="tc-body">
+                <h3>Marc Lefebvre</h3>
+                <p class="tc-bio">Rôliste depuis 1998, Marc a fondé l'association en 2020 avec la conviction que le JDR est un formidable outil de création collective et de lien social. Spécialiste de D&D et de GURPS.</p>
+              </div>
+            </div>
+
+            <div class="team-card">
+              <div class="tc-avatar" style="background:linear-gradient(135deg,#1a0808,#7d1c1c);">
+                <span class="tc-initials">MG</span>
+                <div class="tc-badges-wrap"><div class="tc-role-badge">Vice-Présidente</div></div>
+              </div>
+              <div class="tc-body">
+                <h3>Mireille Gasser</h3>
+                <p class="tc-bio">Mireille gère la communication de l'association avec brio. Joueuse passionnée et MJ occasionnelle, elle anime également les ateliers d'initiation pour les plus jeunes.</p>
+              </div>
+            </div>
+
+            <div class="team-card">
+              <div class="tc-avatar" style="background:linear-gradient(135deg,#0a1a1a,#1c5c4b);">
+                <span class="tc-initials">TR</span>
+                <div class="tc-badges-wrap"><div class="tc-role-badge">Trésorier</div></div>
+              </div>
+              <div class="tc-body">
+                <h3>Thomas Ritter</h3>
+                <p class="tc-bio">Thomas veille sur les finances de l'association tout en organisant nos événements avec une précision d'horloger. Grand fan de Pathfinder, il est aussi l'auteur le plus prolifique de notre blog.</p>
+              </div>
+            </div>
+
+            <div class="team-card">
+              <div class="tc-avatar" style="background:linear-gradient(135deg,#1a0a14,#5c1c4b);">
+                <span class="tc-initials">SK</span>
+                <div class="tc-badges-wrap"><div class="tc-role-badge">Secrétaire</div></div>
+              </div>
+              <div class="tc-body">
+                <h3>Sarah Klein</h3>
+                <p class="tc-bio">Sarah documente la vie de l'association à travers son objectif et gère toute la paperasse administrative avec une efficacité redoutable. Spécialiste de Vampire : La Mascarade.</p>
+              </div>
+            </div>
+            </div><!-- /static-bureau-cards -->
+
+          </div>
+
+          <div class="section-header" style="margin-top:4rem;">
+            <h2>Nos Maîtres du <span class="accent">Jeu</span></h2>
+            <p>Les architectes de nos aventures hebdomadaires</p>
+          </div>
+
+          <div class="mj-grid">
+            <div id="dynamic-team-mj" style="display:contents"></div>
+
+            <div id="static-mj-cards" style="display:contents">
+            <div class="mj-card">
+              <div class="mj-avatar" style="background:linear-gradient(135deg,#0a1a0a,#1c5c1c);">
+                <span>PL</span>
+              </div>
+              <h4>Pierre Lux</h4>
+              <p>MJ D&amp;D 5e — 4 ans d'expérience</p>
+            </div>
+
+            <div class="mj-card">
+              <div class="mj-avatar" style="background:linear-gradient(135deg,#1a1a0a,#5c4b1c);">
+                <span>AW</span>
+              </div>
+              <h4>Anna Weber</h4>
+              <p>MJ L'Appel de Cthulhu — 7 ans d'expérience</p>
+            </div>
+
+            <div class="mj-card">
+              <div class="mj-avatar" style="background:linear-gradient(135deg,#0a0a1a,#1c1c5c);">
+                <span>JM</span>
+              </div>
+              <h4>Julien Meyer</h4>
+              <p>MJ Starfinder — 2 ans d'expérience</p>
+            </div>
+
+            <div class="mj-card">
+              <div class="mj-avatar" style="background:linear-gradient(135deg,#1a0a0a,#5c1c1c);">
+                <span>CB</span>
+              </div>
+              <h4>Claire Bigler</h4>
+              <p>MJ Pathfinder 2e — 3 ans d'expérience</p>
+            </div>
+            </div><!-- /static-mj-cards -->
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════  CONTACTS  ═══════════════════════════ -->
+    <section id="contacts" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#0a1a1a 0%,#0a2a1a 50%,#0a1a1a 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Rejoignez-nous</p>
+          <h1>Nous <span class="accent">Contacter</span></h1>
+          <p>Une question ? Envie de rejoindre l'aventure ? Écrivez-nous !</p>
+        </div>
+      </div>
+
+      <div class="section-wrap">
+        <div class="container">
+
+          <div class="contact-layout">
+
+            <!-- Colonne gauche ligne 1 : Notre local -->
+            <div class="ci-block ci-local">
+              <div class="ci-icon">&#128205;</div>
+              <div>
+                <h4>Notre local</h4>
+                <p>Rue de Baldenheim<br>67390 Hessenheim<br>France</p>
+              </div>
+            </div>
+
+            <!-- Colonne droite ligne 1 : Google Maps -->
+            <div class="ci-map">
+              <iframe
+                src="https://www.google.com/maps?q=Rue+de+Baldenheim,+67390+Hessenheim,+France&output=embed"
+                width="100%" height="100%" style="border:0;border-radius:8px;display:block;" allowfullscreen=""
+                loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Notre local">
+              </iframe>
+            </div>
+
+            <!-- Colonne gauche ligne 2 : Contact mail + Discord + Cotisations -->
+            <div class="contact-info-left">
+              <div class="ci-block">
+                <div class="ci-icon">&#128231;</div>
+                <div>
+                  <h4>Contact mail</h4>
+                  <p>contact@ried-et-role.fr<br>Réponse sous 48h</p>
+                </div>
+              </div>
+
+              <div class="ci-block">
+                <div class="ci-icon">&#128172;</div>
+                <div>
+                  <h4>Discord</h4>
+                  <p>Rejoignez notre serveur Discord pour discuter en temps réel avec les membres.</p>
+                  <a href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-top:0.5rem;">Rejoindre le Discord</a>
+                </div>
+              </div>
+
+              <div class="membership-box">
+                <h4>&#9670; Cotisations 2026</h4>
+                <div class="membership-prices">
+                  <a href="https://www.helloasso.com/associations/espace-enfants-grand-ried/adhesions/adhesion-carte-de-membre-annuelle-eegr" target="_blank" rel="noopener" class="mp-item mp-item-link">
+                    <span class="mp-type">Espace Enfants Grand Ried <small>(Asso Mère)</small></span>
+                    <span class="mp-price">15 €<span>/an</span></span>
+                  </a>
+                  <a href="https://www.helloasso.com/associations/espace-enfants-grand-ried/adhesions/adhesion-ried-and-role" target="_blank" rel="noopener" class="mp-item mp-item-link">
+                    <span class="mp-type">Ried &amp; Rôle</span>
+                    <span class="mp-price">10 €<span>/an</span></span>
+                  </a>
+                </div>
+                <p style="font-size:0.85rem;color:#aaa;margin-top:1rem;">Chaque adhésion se fait séparément et a un coût propre, mais les deux sont obligatoires.<br>Au total, l'adhésion coûte 25 € pour un an de date à date, peu importe quand vous adhérez.</p>
+                <p style="font-size:0.85rem;color:#aaa;margin-top:0.5rem;">L'adhésion donne accès à toutes nos sessions, événements membres et à l'emprunt de matériel de jeu.</p>
+              </div>
+            </div>
+
+            <!-- Colonne droite ligne 2 : Formulaire -->
+            <div class="contact-form-wrap">
+              <form class="contact-form" id="contact-form">
+                <h3>Envoyer un message</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="fname">Prénom *</label>
+                    <input type="text" id="fname" name="fname" placeholder="Votre prénom" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="lname">Nom *</label>
+                    <input type="text" id="lname" name="lname" placeholder="Votre nom" required />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="email">Email *</label>
+                  <input type="email" id="email" name="email" placeholder="votre@email.fr" required />
+                </div>
+                <div class="form-group">
+                  <label for="subject">Sujet</label>
+                  <select id="subject" name="subject">
+                    <option value="">— Choisir un sujet —</option>
+                    <option>Adhésion à l'association</option>
+                    <option>Rejoindre une table</option>
+                    <option>Organiser un événement</option>
+                    <option>Partenariat</option>
+                    <option>Autre</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="message">Message *</label>
+                  <textarea id="message" name="message" rows="5" placeholder="Votre message…" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Envoyer le message &#10148;</button>
+                <div class="form-success" id="form-success">
+                  &#10003; Votre message a bien été envoyé ! Nous vous répondrons dans les 48h.
+                </div>
+              </form>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════  FOOTER  ═══════════════════════════ -->
+  <footer id="site-footer">
+    <div class="footer-main">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-about">
+            <a href="#home" class="logo nav-link" data-target="home">
+              <span class="logo-icon">&#9670;</span>
+              <div class="logo-text">
+                <span class="logo-name">Ried &amp; Rôle</span>
+                <span class="logo-sub">Association de Jeux de Rôle</span>
+              </div>
+            </a>
+            <p>Association fondée en 2024, Ried &amp; Rôle rassemble les passionnés de jeux de rôle du Ried Centre-Alsace autour de tables conviviales et d'aventures mémorables.</p>
+            <div class="footer-social">
+              <a href="https://www.facebook.com/profile.php?id=61555805010547" target="_blank" rel="noopener" aria-label="Facebook">f</a>
+              <a href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" aria-label="Discord">D</a>
+              <a href="https://www.instagram.com/riednrole/" target="_blank" rel="noopener" aria-label="Instagram">&#9632;</a>
+            </div>
+          </div>
+          <div class="footer-links">
+            <h5>Navigation</h5>
+            <ul>
+              <li><a href="#home" class="nav-link" data-target="home">Home</a></li>
+              <li><a href="#jeux" class="nav-link" data-target="jeux">Jeux de Rôles</a></li>
+              <li><a href="#evenements" class="nav-link" data-target="evenements">Événements</a></li>
+              <li><a href="#blog" class="nav-link" data-target="blog">Blog</a></li>
+              <li><a href="#equipe" class="nav-link" data-target="equipe">L'Équipe</a></li>
+              <li><a href="#contacts" class="nav-link" data-target="contacts">Contacts</a></li>
+            </ul>
+          </div>
+          <div class="footer-contact">
+            <h5>Nous trouver</h5>
+            <p>&#128205; Sous la salle polyvalente<br>Rue de Baldenheim<br>67390 Hessenheim</p>
+            <p>&#128231; contact@ried-et-role.fr</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <p>&copy; 2026 Ried &amp; Rôle</p>
+        <p>Fait avec &#9829; en Alsace</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ══════════════  MODAL INSCRIPTION  ══════════════ -->
+  <div id="inscription-overlay" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-title">S'inscrire</h3>
+      <p id="inscription-event-title" class="modal-event-title"></p>
+      <form id="inscription-form" novalidate>
+        <div class="form-group">
+          <label for="ins-name">Nom, Prénom ou Pseudo *</label>
+          <input type="text" id="ins-name" placeholder="Votre nom ou pseudo" required />
+        </div>
+        <div class="form-group">
+          <label for="ins-email">Adresse e-mail *</label>
+          <input type="email" id="ins-email" placeholder="votre@email.fr" required />
+        </div>
+        <div class="form-group">
+          <label class="ins-check-row" for="ins-firsttime">
+            <span>Jamais joué à un Jeu de rôle</span>
+            <input type="checkbox" id="ins-firsttime" />
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Table préférée</label>
+          <div class="univers-grid" id="ins-univers-list"></div>
+        </div>
+        <div id="ins-error" class="ins-error" hidden>Merci de remplir les champs obligatoires.</div>
+        <div class="modal-actions">
+          <button type="button" id="inscription-cancel" class="btn btn-outline">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

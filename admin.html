@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration — Ried &amp; Rôle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Rajdhani:wght@400;500;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════  ÉCRAN DE CONNEXION  ═══════════════════ -->
+  <div id="login-screen">
+    <div class="login-bg-grid"></div>
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="logo-icon">&#9670;</span>
+        <div>
+          <span class="logo-name">Ried &amp; Rôle</span>
+          <span class="logo-sub">Administration</span>
+        </div>
+      </div>
+      <h2>Connexion</h2>
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="login-user">Identifiant</label>
+          <input type="email" id="login-user" autocomplete="username" placeholder="admin@exemple.com" required />
+        </div>
+        <div class="form-group">
+          <label for="login-pass">Mot de passe</label>
+          <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••" required />
+        </div>
+        <div id="login-error" class="login-error" hidden>Identifiants incorrects.</div>
+        <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
+      </form>
+      <a href="index.html" class="back-link">&#8592; Retour au site</a>
+    </div>
+  </div>
+
+  <!-- ═══════════════════  SHELL ADMIN  ═══════════════════════════ -->
+  <div id="admin-shell" class="hidden">
+
+    <!-- Top bar -->
+    <header id="admin-header">
+      <a href="index.html" class="admin-logo">
+        <span class="logo-icon">&#9670;</span>
+        <span>Ried &amp; Rôle</span>
+        <span class="admin-badge">ADMIN</span>
+      </a>
+      <nav class="admin-nav">
+        <button class="admin-nav-btn active" data-section="evenements">
+          <span class="nav-icon">&#128197;</span> Événements
+        </button>
+        <button class="admin-nav-btn" data-section="jeux">
+          <span class="nav-icon">&#9876;</span> Jeux de Rôles
+        </button>
+        <button class="admin-nav-btn" data-section="equipe">
+          <span class="nav-icon">&#128100;</span> L'Équipe
+        </button>
+        <button class="admin-nav-btn" data-section="blog">
+          <span class="nav-icon">&#128240;</span> Blog
+        </button>
+        <button class="admin-nav-btn" data-section="site">
+          <span class="nav-icon">&#9881;</span> Site
+        </button>
+      </nav>
+      <button id="logout-btn" class="btn btn-outline-sm">&#128682; Déconnexion</button>
+    </header>
+
+    <main id="admin-main">
+
+      <!-- ═══════════════  SECTION ÉVÉNEMENTS  ═══════════════════ -->
+      <section id="section-evenements" class="admin-section active">
+        <div class="section-title-bar">
+          <h2>&#128197; Gestion des Événements</h2>
+          <p>Les événements ajoutés ici apparaîtront sur la page Événements du site.</p>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Événements enregistrés</h3>
+              <span class="item-count" id="count-events">0</span>
+            </div>
+            <div id="list-events" class="admin-list">
+              <p class="empty-msg">Aucun événement enregistré.</p>
+            </div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="admin-form-panel">
+            <div class="panel-header">
+              <h3>Ajouter un événement</h3>
+            </div>
+            <form id="form-events" novalidate>
+
+              <p class="form-section-title">Date de début *</p>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Jour *</label>
+                  <input type="text" name="startDay" placeholder="10" maxlength="2" required />
+                </div>
+                <div class="form-group">
+                  <label>Mois *</label>
+                  <select name="startMonth" required>
+                    <option value="">—</option>
+                    <option>Jan</option><option>Fév</option><option>Mar</option>
+                    <option>Avr</option><option>Mai</option><option>Jun</option>
+                    <option>Jul</option><option>Aoû</option><option>Sep</option>
+                    <option>Oct</option><option>Nov</option><option>Déc</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Année *</label>
+                  <input type="text" name="startYear" placeholder="2026" maxlength="4" required />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Heure de début</label>
+                  <input type="text" name="startTimeFrom" placeholder="10h00" />
+                </div>
+                <div class="form-group">
+                  <label>Heure de fin</label>
+                  <input type="text" name="startTimeTo" placeholder="22h00" />
+                </div>
+              </div>
+
+              <p class="form-section-title">Date de fin <small>(optionnelle)</small></p>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Jour</label>
+                  <input type="text" name="endDay" placeholder="12" maxlength="2" />
+                </div>
+                <div class="form-group">
+                  <label>Mois</label>
+                  <select name="endMonth">
+                    <option value="">—</option>
+                    <option>Jan</option><option>Fév</option><option>Mar</option>
+                    <option>Avr</option><option>Mai</option><option>Jun</option>
+                    <option>Jul</option><option>Aoû</option><option>Sep</option>
+                    <option>Oct</option><option>Nov</option><option>Déc</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Année</label>
+                  <input type="text" name="endYear" placeholder="2026" maxlength="4" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Heure de début</label>
+                  <input type="text" name="endTimeFrom" placeholder="10h00" />
+                </div>
+                <div class="form-group">
+                  <label>Heure de fin</label>
+                  <input type="text" name="endTimeTo" placeholder="22h00" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Titre *</label>
+                <input type="text" name="title" placeholder="Convention Printanière 2026" required />
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Étiquette</label>
+                  <input type="text" name="tag" placeholder="Événement phare" />
+                </div>
+                <div class="form-group">
+                  <label>Couleur</label>
+                  <select name="tagColor">
+                    <option value="orange">Orange</option>
+                    <option value="purple">Violet</option>
+                    <option value="red">Rouge</option>
+                    <option value="green">Vert</option>
+                    <option value="blue">Bleu</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Description *</label>
+                <textarea name="description" rows="3" placeholder="Description de l'événement…" required></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Lieu</label>
+                  <input type="text" name="location" placeholder="Salle des fêtes de Rhinau" />
+                </div>
+                <div class="form-group">
+                  <label>Capacité</label>
+                  <input type="text" name="capacity" placeholder="150 personnes" />
+                </div>
+              </div>
+
+              <div class="form-group form-check">
+                <label>
+                  <input type="checkbox" name="inscription" />
+                  Inscription obligatoire
+                </label>
+              </div>
+
+              <div class="form-group form-check">
+                <label>
+                  <input type="checkbox" name="featured" />
+                  Événement phare (affiché en vedette)
+                </label>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">Ajouter l'événement</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════  SECTION JEUX  ═══════════════════════════ -->
+      <section id="section-jeux" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#9876; Gestion des Jeux de Rôles</h2>
+          <p>Les jeux ajoutés ici apparaîtront sur la page Jeux de Rôles du site.</p>
+        </div>
+        <div class="admin-layout">
+
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Jeux enregistrés</h3>
+              <span class="item-count" id="count-games">0</span>
+            </div>
+            <div id="list-games" class="admin-list">
+              <p class="empty-msg">Aucun jeu enregistré.</p>
+            </div>
+          </div>
+
+          <div class="admin-form-panel">
+            <div class="panel-header">
+              <h3>Ajouter un jeu</h3>
+            </div>
+            <form id="form-games" novalidate>
+              <div class="form-group">
+                <label>Titre du jeu *</label>
+                <input type="text" name="title" placeholder="Donjons &amp; Dragons 5e" required />
+              </div>
+
+              <div class="form-group">
+                <label>Catégorie *</label>
+                <select name="category" required id="game-category">
+                  <option value="">— Choisir —</option>
+                  <option value="fantasy">⚔ Fantasy</option>
+                  <option value="horreur">💀 Horreur</option>
+                  <option value="scifi">🚀 Sci-Fi</option>
+                  <option value="historique">🏛️ Historique</option>
+                  <option value="multivers">🌀 Multivers</option>
+                  <option value="cyberpunk">🤖 Cyberpunk</option>
+                  <option value="postapocalypse">☢️ Post-Apocalypse</option>
+                  <option value="caricatural">🃏 Caricatural</option>
+                  <option value="contemporain">🏙️ Contemporain</option>
+                  <option value="fantasyjap">⛩️ Fantasy Japonisante</option>
+                  <option value="superheros">⚡ Super-Héros</option>
+                  <option value="western">🤠 Western</option>
+                  <option value="generique">⚙️ Système Générique</option>
+                  <option value="autre">❓ Autre</option>
+                  <option value="pirates">⚓ Pirates</option>
+                  <option value="sciencefantasy">🔮 Science-Fantasy</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Description *</label>
+                <textarea name="description" rows="3" placeholder="Description du jeu…" required></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Points clés <small>(séparés par des virgules)</small></label>
+                <input type="text" name="badges" placeholder="Débutants bienvenus, Campagnes longues" />
+              </div>
+
+              <div class="form-group form-check">
+                <label>
+                  <input type="checkbox" name="popular" />
+                  Jeu populaire (mis en avant sur la page d'accueil)
+                </label>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">Ajouter le jeu</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════  SECTION ÉQUIPE  ═══════════════════════ -->
+      <section id="section-equipe" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128100; Gestion de l'Équipe</h2>
+          <p>Ajoutez des membres du bureau ou des Maîtres du Jeu. Ils apparaîtront sur la page L'Équipe.</p>
+        </div>
+        <div class="admin-layout">
+
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Membres enregistrés</h3>
+              <span class="item-count" id="count-team">0</span>
+            </div>
+            <div id="list-team" class="admin-list">
+              <p class="empty-msg">Aucun membre enregistré.</p>
+            </div>
+          </div>
+
+          <div class="admin-form-panel">
+            <div class="panel-header">
+              <h3>Ajouter un membre</h3>
+            </div>
+            <form id="form-team" novalidate>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Nom complet *</label>
+                  <input type="text" name="name" placeholder="Marc Lefebvre" required />
+                </div>
+                <div class="form-group">
+                  <label>Type *</label>
+                  <select name="type" required id="member-type">
+                    <option value="bureau">Bureau</option>
+                    <option value="mj">Maître du Jeu</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Photo <small>(optionnelle — remplace les initiales)</small></label>
+                <input type="file" id="member-photo-input" accept="image/*" />
+                <div id="member-photo-preview" style="display:none; margin-top:.6rem;">
+                  <img id="member-photo-img" src="" alt="Aperçu" class="photo-preview-img" />
+                  <button type="button" id="member-photo-clear" class="btn-photo-clear">&#10005; Supprimer la photo</button>
+                </div>
+              </div>
+
+              <div class="form-row" id="role-badge-group">
+                <div class="form-group">
+                  <label>Rôle / Titre *</label>
+                  <input type="text" id="role-input" name="role" placeholder="Président &amp; Maître de Jeu" required />
+                </div>
+                <div class="form-group">
+                  <label>Badge(s) <small>(séparés par des virgules)</small></label>
+                  <input type="text" name="roleBadge" placeholder="Président, Maître de Jeu" />
+                </div>
+              </div>
+
+
+              <div class="form-group">
+                <label>Biographie</label>
+                <textarea name="bio" rows="3" placeholder="Quelques mots sur ce membre…"></textarea>
+              </div>
+
+              <div class="form-group" id="games-group" style="display:none">
+                <label>Jeux pratiqués <small>(séparés par des virgules)</small></label>
+                <input type="text" name="games" placeholder="D&amp;D 5e, GURPS, Shadowrun" />
+              </div>
+
+              <div class="form-group">
+                <label>Couleur de l'avatar</label>
+                <select name="gradient">
+                  <option value="linear-gradient(135deg,#1a0a2e,#4b1c7d)">Violet sombre</option>
+                  <option value="linear-gradient(135deg,#1a0808,#7d1c1c)">Rouge sombre</option>
+                  <option value="linear-gradient(135deg,#0a1a1a,#1c5c4b)">Vert sombre</option>
+                  <option value="linear-gradient(135deg,#0a0a1a,#1c1c5c)">Bleu sombre</option>
+                  <option value="linear-gradient(135deg,#1a1a0a,#5c4b1c)">Or sombre</option>
+                  <option value="linear-gradient(135deg,#1a0a14,#5c1c4b)">Mauve sombre</option>
+                  <option value="linear-gradient(135deg,#0a1a0a,#1c5c1c)">Vert forêt</option>
+                </select>
+              </div>
+
+              <div class="form-group form-check" id="president-group">
+                <label>
+                  <input type="checkbox" name="isPresident" />
+                  Marquer comme Président(e) (encadré doré)
+                </label>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">Ajouter le membre</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════  SECTION BLOG  ═══════════════════════════ -->
+      <section id="section-blog" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128240; Gestion du Blog</h2>
+          <p>Les articles ajoutés ici apparaîtront sur la page Blog du site.</p>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Articles enregistrés</h3>
+              <span class="item-count" id="count-blog">0</span>
+            </div>
+            <div id="list-blog"></div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="admin-form-panel">
+            <h3 class="form-title" id="blog-form-title">Nouvel article</h3>
+            <form id="form-blog" novalidate>
+              <div class="form-group">
+                <label>Titre *</label>
+                <input type="text" name="title" placeholder="Titre de l'article" required />
+              </div>
+              <div class="form-group">
+                <label>Catégorie *</label>
+                <select name="category" required>
+                  <option value="">— Choisir —</option>
+                  <option value="annonce">📢 Annonce</option>
+                  <option value="critique">🎮 Critique de jeu</option>
+                  <option value="evenement">🎉 Événement</option>
+                  <option value="conseil-mj">📜 Conseil MJ</option>
+                  <option value="conseil-joueur">🎲 Conseil Joueur</option>
+                  <option value="photos">📷 Photos</option>
+                  <option value="vie-asso">🏠 Vie de l'asso</option>
+                  <option value="compte-rendu">📖 Compte rendu de partie</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Auteur *</label>
+                <input type="text" name="author" placeholder="Prénom Nom" required />
+              </div>
+              <div class="form-group">
+                <label>Date *</label>
+                <input type="date" name="date" required />
+              </div>
+              <div class="form-group">
+                <label>Extrait *</label>
+                <textarea name="excerpt" rows="5" placeholder="Résumé de l'article (affiché sur le site)..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-full">Ajouter l'article</button>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ═══════════════  SECTION SITE  ══════════════════════════ -->
+      <section id="section-site" class="admin-section">
+
+        <!-- ── Statistiques ── -->
+        <div class="section-title-bar">
+          <h2>&#9881; Paramètres du Site</h2>
+          <p>Ces valeurs apparaissent dans la barre de statistiques de la page d'accueil.</p>
+        </div>
+        <div class="site-settings-panel">
+          <form id="form-site" novalidate>
+            <div class="site-settings-grid">
+              <div class="form-group">
+                <label for="site-membres">Nombre de membres</label>
+                <input type="number" id="site-membres" min="0" placeholder="42" />
+              </div>
+              <div class="form-group">
+                <label for="site-parties">Parties pratiquées</label>
+                <input type="number" id="site-parties" min="0" placeholder="8" />
+              </div>
+              <div class="form-group">
+                <label for="site-evenements">Événements / an</label>
+                <input type="number" id="site-evenements" min="0" placeholder="15" />
+              </div>
+              <div class="form-group">
+                <label for="site-annees">Années d'existence</label>
+                <input type="number" id="site-annees" min="0" placeholder="6" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
+          </form>
+        </div>
+
+        <!-- ── Comptes administrateur ── -->
+        <div class="section-title-bar section-title-bar--sub">
+          <h2>&#128100; Comptes Administrateur</h2>
+          <p>Gérez les accès à l'interface d'administration. Le super-admin (config.json) dispose toujours de tous les droits.</p>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Comptes enregistrés</h3>
+              <span class="item-count" id="count-accounts">0</span>
+            </div>
+            <div id="list-accounts" class="admin-list">
+              <p class="empty-msg">Aucun compte enregistré.</p>
+            </div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="admin-form-panel">
+            <h3 class="form-title" id="acc-form-title">Nouveau compte</h3>
+            <form id="form-account" novalidate autocomplete="off">
+
+              <div class="form-group">
+                <label for="acc-login">Login (email) *</label>
+                <input type="email" id="acc-login" placeholder="prenom.nom@exemple.com" autocomplete="off" required />
+              </div>
+
+              <div class="form-group">
+                <label for="acc-fullname">Nom complet *</label>
+                <input type="text" id="acc-fullname" placeholder="Jean Dupont" required />
+              </div>
+
+              <div class="form-group">
+                <label for="acc-password">Mot de passe *</label>
+                <input type="password" id="acc-password" autocomplete="new-password"
+                       placeholder="12 car. min, 1 maj., 1 chiffre, 1 spécial" />
+                <small class="form-hint">12 caractères minimum · 1 majuscule · 1 chiffre · 1 caractère spécial</small>
+              </div>
+
+              <div class="form-group">
+                <label for="acc-password2">Confirmer le mot de passe *</label>
+                <input type="password" id="acc-password2" autocomplete="new-password" placeholder="Répéter le mot de passe" />
+              </div>
+
+              <div class="form-group">
+                <label>Autorisations</label>
+                <div class="perms-grid">
+                  <label class="perm-label perm-label--all">
+                    <input type="checkbox" id="acc-perm-tous" />
+                    <span>Tous</span>
+                  </label>
+                  <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="evenements" />
+                    <span>Événements</span>
+                  </label>
+                  <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="jeux" />
+                    <span>Jeux de Rôles</span>
+                  </label>
+                  <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="equipe" />
+                    <span>L'Équipe</span>
+                  </label>
+                  <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="blog" />
+                    <span>Blog</span>
+                  </label>
+                  <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="site" />
+                    <span>Site</span>
+                  </label>
+                </div>
+              </div>
+
+              <p id="acc-form-error" class="form-error" hidden></p>
+
+              <button type="submit" class="btn btn-primary btn-full">Créer le compte</button>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="admin-toast" class="admin-toast" aria-live="polite"></div>
+
+  <!-- ══════════════  MODAL INSCRIPTIONS  ══════════════ -->
+  <div id="reg-overlay" class="modal-overlay" hidden>
+    <div class="modal-card modal-card-wide">
+      <h3 class="modal-title">Inscriptions — <span id="reg-event-title"></span></h3>
+      <div id="reg-list" class="reg-list"></div>
+      <div class="modal-actions" style="margin-top:1.5rem;">
+        <button type="button" id="reg-close" class="btn btn-primary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL AJOUTER TABLE  ══════════════ -->
+  <div id="table-overlay" class="modal-overlay" hidden>
+    <div class="modal-card modal-card-wide">
+      <h3 class="modal-title">Ajouter une table</h3>
+      <p class="modal-event-sublabel" id="table-event-label"></p>
+      <form id="form-table" novalidate>
+
+        <div class="form-group">
+          <label>Jeu <small>* (depuis le catalogue)</small></label>
+          <select id="table-game-select" required>
+            <option value="">— Choisir dans le catalogue —</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Joueurs min *</label>
+            <input type="number" id="table-players-min" min="1" max="20" placeholder="2" required>
+          </div>
+          <div class="form-group">
+            <label>Joueurs max *</label>
+            <input type="number" id="table-players-max" min="1" max="20" placeholder="6" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Durée approximative *</label>
+          <input type="text" id="table-duration" placeholder="ex : 3h, 2h–4h">
+        </div>
+
+        <div class="form-group">
+          <label>Synopsis du scénario *</label>
+          <textarea id="table-synopsis" rows="4" placeholder="Résumé du scénario…"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Maître de jeu <small>(optionnel)</small></label>
+          <input type="text" id="table-gm" placeholder="Nom ou pseudo du MJ…">
+        </div>
+
+        <div class="form-group">
+          <label>Points Clés <small>(Entrée ou virgule pour valider)</small></label>
+          <div class="tags-input-wrap" id="table-tags-wrap">
+            <span id="table-tags-list"></span>
+            <input type="text" id="table-tag-input" class="tag-text-input" placeholder="Ajouter un tag…">
+          </div>
+        </div>
+
+        <p id="table-form-error" class="table-form-error" hidden></p>
+
+        <div class="modal-actions">
+          <button type="button" id="table-cancel" class="btn-outline-sm">Annuler</button>
+          <button type="submit" class="btn btn-primary">Ajouter la table</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
