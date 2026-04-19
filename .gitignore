@@ -1,6 +1,3 @@
-# Données utilisateur (persistées via volume Railway en production)
-data/
-
 # Credentials — ne jamais versionner
 config.json
 
