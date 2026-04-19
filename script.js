@@ -121,6 +121,11 @@ function eventEffectiveEndDate(e) {
 /* ─── Events ─────────────────────────────────────────────────────── */
 function loadDynamicEvents() {
   const events = _data.events;
+
+  // Hide static fallbacks as soon as data has loaded (even if empty)
+  document.querySelector('.event-hero-card.static-fallback')?.style.setProperty('display', 'none');
+  document.querySelectorAll('.events-timeline > .event-item').forEach(el => el.style.display = 'none');
+
   if (!events.length) return;
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -139,19 +144,12 @@ function loadDynamicEvents() {
 
   if (featured) {
     const el = document.getElementById('dynamic-featured-event');
-    if (el) {
-      el.innerHTML = buildFeaturedEventHTML(featured);
-      const fallback = document.querySelector('.event-hero-card.static-fallback');
-      if (fallback) fallback.style.display = 'none';
-    }
+    if (el) el.innerHTML = buildFeaturedEventHTML(featured);
   }
 
   const container = document.getElementById('dynamic-events');
   if (container) {
     container.innerHTML = timeline.map(buildTimelineEventHTML).join('');
-    if (timeline.length) {
-      document.querySelectorAll('.events-timeline > .event-item').forEach(el => el.style.display = 'none');
-    }
   }
 
   const pastContainer = document.getElementById('past-events');
