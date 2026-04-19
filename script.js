@@ -1,0 +1,723 @@
+/* ═══════════════════════════════════════════════════════════════════
+   RIED & RÔLE — Main Script
+   ═══════════════════════════════════════════════════════════════════ */
+
+'use strict';
+
+/* ─── Helpers ─────────────────────────────────────────────────────── */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+const FR_MONTHS = { Jan:0, 'Fév':1, Mar:2, Avr:3, Mai:4, Jun:5, Jul:6, 'Aoû':7, Sep:8, Oct:9, Nov:10, 'Déc':11 };
+
+/* ─── In-memory data store (populated by loadAllData) ────────────── */
+const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [] };
+
+const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog' };
+
+const BLOG_CATS = {
+  'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' },
+  'critique':       { label: 'Critique de jeu',        color: 'purple', icon: '🎮', gradient: 'linear-gradient(135deg,#1a0a2e,#4b1c7d)' },
+  'evenement':      { label: 'Événement',              color: 'red',    icon: '🎉', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)' },
+  'conseil-mj':     { label: 'Conseil MJ',             color: 'orange', icon: '📜', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
+  'conseil-joueur': { label: 'Conseil Joueur',         color: 'green',  icon: '🎲', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)' },
+  'photos':         { label: 'Photos',                 color: 'teal',   icon: '📷', gradient: 'linear-gradient(135deg,#001014,#002535)' },
+  'vie-asso':       { label: "Vie de l'asso",          color: 'pink',   icon: '🏠', gradient: 'linear-gradient(135deg,#1a0514,#5c0d3a)' },
+  'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
+};
+
+function formatBlogDate(isoDate) {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+}
+
+async function loadAllData() {
+  await Promise.all(Object.keys(_data).map(async key => {
+    try {
+      const res = await fetch(`/data/${key}.json`);
+      if (res.ok) { _data[key] = await res.json(); return; }
+    } catch {}
+    // Fallback: localStorage (file:// or server down)
+    try { _data[key] = JSON.parse(localStorage.getItem(LS_KEYS[key]) || '[]'); }
+    catch { _data[key] = []; }
+  }));
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DYNAMIC CONTENT — loaded from data/ files (via server)
+══════════════════════════════════════════════════════════════════ */
+(async function loadDynamicContent() {
+  await loadAllData();
+  loadDynamicEvents();
+  loadDynamicGames();
+  loadHomeGames();
+  loadDynamicTeam();
+  loadDynamicBlog();
+  loadHomeBlog();
+  await applyStatConfig();
+})();
+
+function loadHomeGames() {
+  const container = document.getElementById('home-games-grid');
+  if (!container) return;
+  const games = _data.games;
+  if (!games.length) return;
+
+  const popular = games.filter(g => g.popular);
+  const display = (popular.length >= 3 ? popular : games).slice(0, 3);
+
+  container.innerHTML = display.map(g => `
+    <div class="game-card${g.popular ? ' featured-card' : ''}">
+      ${g.popular ? '<div class="ribbon">Populaire</div>' : ''}
+      <div class="game-card-img" style="background:${escHtml(g.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)')};">
+        <div class="game-card-icon">${escHtml(g.icon || '⚔')}</div>
+      </div>
+      <div class="game-card-body">
+        <span class="tag tag-${escHtml(g.tagColor)}">${escHtml(g.tag)}</span>
+        <h3>${escHtml(g.title)}</h3>
+        <p>${escHtml(g.description)}</p>
+        <a href="#jeux" class="btn btn-sm nav-link" data-target="jeux" data-scroll-to="game-${escHtml(g.id)}">En savoir plus</a>
+      </div>
+    </div>`).join('');
+}
+
+function populateTableCheckboxes(eventId) {
+  const container = document.getElementById('ins-univers-list');
+  if (!container) return;
+  const tables = (_data.tables || []).filter(t => t.eventId === eventId && !t.cancelled);
+  if (!tables.length) {
+    container.innerHTML = '<span class="univers-empty">Aucune table disponible pour cet événement.</span>';
+    return;
+  }
+  container.innerHTML = tables.map(t =>
+    `<label><input type="checkbox" value="${escHtml(t.gameName)}"> ${escHtml(t.gameName)}</label>`
+  ).join('');
+}
+
+/* ─── Date helpers ────────────────────────────────────────────────── */
+function eventToDate(e) {
+  const day = parseInt(e.startDay || e.day, 10);
+  const mon = FR_MONTHS[e.startMonth || e.month];
+  const yr  = parseInt(e.startYear  || e.year, 10);
+  if (isNaN(day) || mon === undefined || isNaN(yr)) return null;
+  return new Date(yr, mon, day);
+}
+
+function eventEffectiveEndDate(e) {
+  if (e.endDay) {
+    const day = parseInt(e.endDay, 10);
+    const mon = FR_MONTHS[e.endMonth];
+    const yr  = parseInt(e.endYear, 10);
+    if (!isNaN(day) && mon !== undefined && !isNaN(yr)) return new Date(yr, mon, day);
+  }
+  return eventToDate(e);
+}
+
+/* ─── Events ─────────────────────────────────────────────────────── */
+function loadDynamicEvents() {
+  const events = _data.events;
+  if (!events.length) return;
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  const upcoming = [], past = [];
+  events.forEach(e => {
+    const end = eventEffectiveEndDate(e);
+    (end && end < today ? past : upcoming).push(e);
+  });
+
+  upcoming.sort((a, b) => (eventToDate(a) || 0) - (eventToDate(b) || 0));
+  past.sort((a, b) => (eventEffectiveEndDate(b) || 0) - (eventEffectiveEndDate(a) || 0));
+
+  const featured = upcoming[0];
+  const timeline = upcoming.slice(1);
+
+  if (featured) {
+    const el = document.getElementById('dynamic-featured-event');
+    if (el) {
+      el.innerHTML = buildFeaturedEventHTML(featured);
+      const fallback = document.querySelector('.event-hero-card.static-fallback');
+      if (fallback) fallback.style.display = 'none';
+    }
+  }
+
+  const container = document.getElementById('dynamic-events');
+  if (container) {
+    container.innerHTML = timeline.map(buildTimelineEventHTML).join('');
+    if (timeline.length) {
+      document.querySelectorAll('.events-timeline > .event-item').forEach(el => el.style.display = 'none');
+    }
+  }
+
+  const pastContainer = document.getElementById('past-events');
+  const pastTitle     = document.getElementById('past-events-title');
+  if (pastContainer && past.length) {
+    pastContainer.innerHTML = past.map(buildTimelineEventHTML).join('');
+    if (pastTitle) pastTitle.hidden = false;
+  }
+}
+
+function eventTimeDisplay(e) {
+  const sFrom = e.startTimeFrom || e.startTime || e.time || '';
+  const sTo   = e.startTimeTo   || e.endTime   || '';
+  const eFrom = e.endTimeFrom   || '';
+  const eTo   = e.endTimeTo     || '';
+  return {
+    start: sFrom && sTo ? `${sFrom} – ${sTo}` : sFrom,
+    end:   eFrom && eTo ? `${eFrom} – ${eTo}` : eFrom
+  };
+}
+
+function registrationCount(eventId) {
+  return (_data.registrations || []).filter(r => r.eventId === eventId).length;
+}
+
+function refreshSpots(eventId) {
+  const e = (_data.events || []).find(ev => ev.id === eventId);
+  if (!e) return;
+  document.querySelectorAll(`[data-spots="${eventId}"]`).forEach(el => {
+    el.innerHTML = `&#9998;${spotsLabel(e)}`;
+  });
+}
+
+function spotsLabel(e) {
+  if (!e.inscription) return '';
+  const cap = parseInt(e.capacity, 10);
+  if (!cap) return ' Inscription obligatoire';
+  const taken = registrationCount(e.id);
+  const left  = Math.max(0, cap - taken);
+  return ` Inscription obligatoire — ${left} place${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''}`;
+}
+
+function buildDateRangeDisplay(e, times) {
+  const sDay = escHtml(e.startDay   || e.day   || '');
+  const sMon = escHtml(e.startMonth || e.month || '');
+  const sYr  = escHtml(e.startYear  || e.year  || '');
+  const startDate   = `${sDay} ${sMon} ${sYr}`.trim();
+  const startSuffix = times.start ? ` : ${escHtml(times.start)}` : '';
+
+  if (!e.endDay) return startDate + startSuffix;
+
+  const endDate   = `${escHtml(e.endDay)} ${escHtml(e.endMonth)} ${escHtml(e.endYear)}`.trim();
+  const endSuffix = times.end ? ` : ${escHtml(times.end)}` : '';
+  return `Du ${startDate}${startSuffix} au ${endDate}${endSuffix}`;
+}
+
+function buildEventTablesHTML(eventId) {
+  const tables = (_data.tables || []).filter(t => t.eventId === eventId && !t.cancelled);
+  if (!tables.length) return '';
+  return `<div class="event-tables-pub">
+    <span class="event-tables-pub-label">&#127922; Tables :</span>
+    ${tables.map(t => `<span class="event-tables-pub-chip">${escHtml(t.gameName)}</span>`).join('')}
+  </div>`;
+}
+
+function buildFeaturedEventHTML(e) {
+  const times    = eventTimeDisplay(e);
+  const dateRange = buildDateRangeDisplay(e, times);
+  return `
+  <div class="event-hero-card">
+    <div class="ehc-date-block">
+      <span class="ehc-month">${escHtml(e.startMonth || e.month || '')}</span>
+      <span class="ehc-day">${escHtml(e.startDay   || e.day   || '')}</span>
+      <span class="ehc-year">${escHtml(e.startYear  || e.year  || '')}</span>
+    </div>
+    <div class="ehc-body">
+      <span class="tag tag-${escHtml(e.tagColor)}">&#9733; ${escHtml(e.tag)}</span>
+      <h2>${escHtml(e.title)}</h2>
+      <p>${escHtml(e.description)}</p>
+      <ul class="event-details">
+        <li>&#128197; ${dateRange}</li>
+        ${e.location    ? `<li>&#128205; ${escHtml(e.location)}</li>` : ''}
+        ${e.capacity    ? `<li>&#128100; ${escHtml(e.capacity)}</li>` : ''}
+        ${e.inscription ? `<li data-spots="${escHtml(e.id)}">&#9998;${spotsLabel(e)}</li>` : ''}
+      </ul>
+      ${buildEventTablesHTML(e.id)}
+      ${e.inscription ? `<button class="btn btn-primary btn-inscrire" data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function buildTimelineEventHTML(e) {
+  const times     = eventTimeDisplay(e);
+  const dateRange = buildDateRangeDisplay(e, times);
+  return `
+  <div class="event-item">
+    <div class="event-date-col">
+      <span class="ed-day">${escHtml(e.startDay   || e.day   || '')}</span>
+      <span class="ed-month">${escHtml(e.startMonth || e.month || '')}</span>
+    </div>
+    <div class="event-connector">
+      <div class="ec-dot"></div>
+      <div class="ec-line"></div>
+    </div>
+    <div class="event-content">
+      <span class="tag tag-${escHtml(e.tagColor)}">${escHtml(e.tag)}</span>
+      <h4>${escHtml(e.title)}</h4>
+      <p>${escHtml(e.description)}</p>
+      <div class="event-meta">
+        <span>&#128197; ${dateRange}</span>
+        ${e.location    ? `<span>&#128205; ${escHtml(e.location)}</span>` : ''}
+        ${e.capacity    ? `<span>&#128100; ${escHtml(e.capacity)}</span>` : ''}
+        ${e.inscription ? `<span data-spots="${escHtml(e.id)}">&#9998;${spotsLabel(e)}</span>` : ''}
+      </div>
+      ${buildEventTablesHTML(e.id)}
+      ${e.inscription ? `<button class="btn btn-primary btn-sm btn-inscrire" style="margin-top:.8rem;" data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ─── Blog ───────────────────────────────────────────────────────── */
+function loadDynamicBlog() {
+  const container = document.getElementById('dynamic-blog');
+  if (!container) return;
+  const articles = _data.blog;
+  if (!articles.length) {
+    container.innerHTML = '<p class="blog-empty">Aucun article publié pour le moment.</p>';
+    loadBlogSidebar();
+    return;
+  }
+  container.innerHTML = articles.map(a => {
+    const cat = BLOG_CATS[a.category] || { label: a.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+    const dateStr = formatBlogDate(a.date);
+    return `
+    <article class="blog-article">
+      <div class="ba-img" style="background:${escHtml(a.gradient || cat.gradient)};">
+        <div class="ba-icon">${escHtml(a.icon || cat.icon)}</div>
+        <div class="ba-date">${escHtml(dateStr)}</div>
+      </div>
+      <div class="ba-body">
+        <div class="ba-cats"><span class="tag tag-${escHtml(a.tagColor || cat.color)}">${escHtml(a.catLabel || cat.label)}</span></div>
+        <h2>${escHtml(a.title)}</h2>
+        <div class="ba-meta">Par <strong>${escHtml(a.author)}</strong> | ${escHtml(dateStr)}</div>
+        <p>${escHtml(a.excerpt)}</p>
+      </div>
+    </article>`;
+  }).join('');
+  loadBlogSidebar();
+}
+
+function loadBlogSidebar() {
+  const catList = document.getElementById('dynamic-cat-list');
+  if (catList) {
+    const counts = {};
+    (_data.blog || []).forEach(a => { counts[a.category] = (counts[a.category] || 0) + 1; });
+    const rows = Object.keys(BLOG_CATS)
+      .filter(k => counts[k])
+      .map(k => `<li><a href="#">${escHtml(BLOG_CATS[k].label)} <span>${counts[k]}</span></a></li>`)
+      .join('');
+    catList.innerHTML = rows || '<li style="color:var(--text-muted);font-size:.9rem">Aucun article</li>';
+  }
+  const recentList = document.getElementById('dynamic-recent-posts');
+  if (recentList) {
+    const recent = (_data.blog || []).slice(0, 4);
+    recentList.innerHTML = recent.length
+      ? recent.map(a => `<li><a href="#">${escHtml(a.title)}</a><span>${escHtml(formatBlogDate(a.date))}</span></li>`).join('')
+      : '<li style="color:var(--text-muted);font-size:.9rem">Aucun article</li>';
+  }
+}
+
+function loadHomeBlog() {
+  const container = document.getElementById('home-blog-grid');
+  if (!container) return;
+  const articles = (_data.blog || []).slice(0, 3);
+  if (!articles.length) { container.innerHTML = ''; return; }
+  const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  container.innerHTML = articles.map((a, i) => {
+    const cat = BLOG_CATS[a.category] || { label: a.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+    const parts = (a.date || '').split('-');
+    const dayNum = parts[2] ? parseInt(parts[2], 10) : '';
+    const monStr = parts[1] ? (months[parseInt(parts[1], 10) - 1] || '') : '';
+    return `
+    <article class="blog-card${i === 0 ? ' wide' : ''}">
+      <div class="blog-card-img" style="background:${escHtml(a.gradient || cat.gradient)};">
+        <div class="blog-date-badge"><span>${escHtml(String(dayNum))}</span><span>${escHtml(monStr)}</span></div>
+        <div class="blog-card-icon">${escHtml(a.icon || cat.icon)}</div>
+      </div>
+      <div class="blog-card-body">
+        <span class="tag tag-${escHtml(a.tagColor || cat.color)}">${escHtml(a.catLabel || cat.label)}</span>
+        <h3><a href="#blog" class="nav-link" data-target="blog">${escHtml(a.title)}</a></h3>
+        <p>${escHtml(a.excerpt)}</p>
+        <div class="blog-meta"><span>Par ${escHtml(a.author)}</span><span>${escHtml(formatBlogDate(a.date))}</span></div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+/* ─── Games ──────────────────────────────────────────────────────── */
+function loadDynamicGames() {
+  const games = [..._data.games].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  const container = document.getElementById('dynamic-games');
+  if (!container || !games.length) return;
+
+  container.innerHTML = games.map(g => `
+  <div class="game-full-card" id="game-${escHtml(g.id)}" data-cat="${escHtml(g.category)}">
+    <div class="gfc-left" style="background:${escHtml(g.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)')};">
+      <div class="gfc-icon">${escHtml(g.icon || '⚔')}</div>
+      <span class="tag tag-${escHtml(g.tagColor)}">${escHtml(g.tag)}</span>
+    </div>
+    <div class="gfc-right">
+      <h3>${escHtml(g.title)}</h3>
+      <p>${escHtml(g.description)}</p>
+      <div class="gfc-tags">
+        ${(g.badges || []).map(b => `<span>${escHtml(b)}</span>`).join('')}
+      </div>
+      <a href="#contacts" class="btn btn-primary btn-sm nav-link" data-target="contacts">Rejoindre une table</a>
+    </div>
+  </div>`).join('');
+}
+
+/* ─── Team ───────────────────────────────────────────────────────── */
+function loadDynamicTeam() {
+  const team = _data.team;
+  if (!team.length) return;
+
+  const bureauContainer = document.getElementById('dynamic-team-bureau');
+  const mjContainer     = document.getElementById('dynamic-team-mj');
+
+  const bureau = team.filter(m => m.type === 'bureau')
+                     .sort((a, b) => (b.isPresident ? 1 : 0) - (a.isPresident ? 1 : 0));
+  const mjs    = team.filter(m => m.type === 'mj');
+
+  if (bureauContainer && bureau.length) {
+    bureauContainer.innerHTML = bureau.map(m => {
+      const badges = String(m.roleBadge || '').split(',').map(s => s.trim()).filter(Boolean);
+      return `
+    <div class="team-card ${m.isPresident ? 'president' : ''}">
+      <div class="tc-avatar" style="background:${m.photo ? 'none' : escHtml(m.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)')};">
+        ${m.photo
+          ? `<img class="tc-photo" src="${escHtml(m.photo)}" alt="${escHtml(m.name)}" />`
+          : `<span class="tc-initials">${escHtml(m.initials)}</span>`}
+        <div class="tc-badges-wrap">
+          ${badges.map(b => `<div class="tc-role-badge">${escHtml(b)}</div>`).join('')}
+        </div>
+      </div>
+      <div class="tc-body">
+        <h3>${escHtml(m.name)}</h3>
+        <p class="tc-bio">${escHtml(m.bio)}</p>
+      </div>
+    </div>`;
+    }).join('');
+    const staticBureau = document.getElementById('static-bureau-cards');
+    if (staticBureau) staticBureau.style.display = 'none';
+  }
+
+  if (mjContainer && mjs.length) {
+    mjContainer.innerHTML = mjs.map(m => `
+    <div class="mj-card">
+      <div class="mj-avatar" style="background:${m.photo ? 'none' : escHtml(m.gradient || 'linear-gradient(135deg,#0a1a0a,#1c5c1c)')};">
+        ${m.photo
+          ? `<img class="mj-photo" src="${escHtml(m.photo)}" alt="${escHtml(m.name)}" />`
+          : `<span>${escHtml(m.initials)}</span>`}
+      </div>
+      <h4>${escHtml(m.name)}</h4>
+      <p>${escHtml(m.role)}</p>
+      ${(m.games || []).length ? `<div class="mj-games">${(m.games).map(g => `<span>${escHtml(g)}</span>`).join('')}</div>` : ''}
+    </div>`).join('');
+    const staticMj = document.getElementById('static-mj-cards');
+    if (staticMj) staticMj.style.display = 'none';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SPA Navigation
+══════════════════════════════════════════════════════════════════ */
+const pages    = document.querySelectorAll('.page');
+const navLinks = document.querySelectorAll('.nav-link');
+const navMenu  = document.getElementById('main-nav');
+const navToggle= document.getElementById('nav-toggle');
+
+function showPage(target, scrollToId) {
+  pages.forEach(p => p.classList.toggle('active', p.id === target));
+
+  navLinks.forEach(l => {
+    l.classList.toggle('active', l.dataset.target === target);
+  });
+
+  try { history.pushState(null, '', '#' + target); } catch {}
+
+  if (scrollToId) {
+    setTimeout(() => {
+      const el = document.getElementById(scrollToId);
+      if (!el) return;
+      const header = document.getElementById('site-header');
+      const offset = header ? header.offsetHeight + 16 : 80;
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }, 50);
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  if (navMenu) navMenu.classList.remove('open');
+  if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+
+  if (target === 'home' && _statDataReady) runCounters();
+}
+
+document.addEventListener('click', e => {
+  const link = e.target.closest('.nav-link');
+  if (!link) return;
+  const target = link.dataset.target;
+  if (!target) return;
+  e.preventDefault();
+  showPage(target, link.dataset.scrollTo);
+});
+
+window.addEventListener('popstate', () => {
+  const hash = location.hash.replace('#', '') || 'home';
+  showPage(hash);
+});
+
+(function init() {
+  try {
+    const hash = location.hash.replace('#', '') || 'home';
+    showPage(hash);
+  } catch (e) { console.error('init error', e); }
+})();
+
+/* ─── Mobile nav toggle ───────────────────────────────────────────── */
+if (navToggle) navToggle.addEventListener('click', () => {
+  const open = navMenu.classList.toggle('open');
+  navToggle.setAttribute('aria-expanded', open);
+});
+
+/* ─── Header scroll shadow ────────────────────────────────────────── */
+const header = document.getElementById('site-header');
+window.addEventListener('scroll', () => {
+  header.classList.toggle('scrolled', window.scrollY > 10);
+}, { passive: true });
+
+/* ─── Site stats config ───────────────────────────────────────────── */
+let _statDataReady = false;
+
+async function applyStatConfig() {
+  let cfg = {};
+  try {
+    const res = await fetch('/data/site.json');
+    if (res.ok) cfg = await res.json();
+  } catch {
+    try { cfg = JSON.parse(localStorage.getItem('rr_site') || '{}'); } catch {}
+  }
+  const map = { membres: 'stat-membres', parties: 'stat-parties', evenements: 'stat-evenements', annees: 'stat-annees' };
+  for (const [key, id] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    if (!el || cfg[key] == null) continue;
+    el.dataset.target = cfg[key];
+  }
+  _statDataReady = true;
+  const homeEl = document.getElementById('home');
+  if (homeEl && homeEl.classList.contains('active')) runCounters();
+}
+
+/* ─── Animated counters ───────────────────────────────────────────── */
+let countersRun = false;
+
+function runCounters() {
+  if (countersRun) return;
+  countersRun = true;
+
+  document.querySelectorAll('.stat-number').forEach(el => {
+    const target = +el.dataset.target;
+    const duration = 1400;
+    const step = 16;
+    const increments = Math.ceil(duration / step);
+    let current = 0;
+    let count = 0;
+
+    const timer = setInterval(() => {
+      count++;
+      current = Math.round((target * count) / increments);
+      el.textContent = current;
+      if (count >= increments) {
+        el.textContent = target;
+        clearInterval(timer);
+      }
+    }, step);
+  });
+}
+
+/* ─── Filter buttons (Jeux de rôles) ─────────────────────────────── */
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const filter = btn.dataset.filter;
+    document.querySelectorAll('.game-full-card').forEach(card => {
+      if (filter === 'all' || card.dataset.cat === filter) {
+        card.classList.remove('hidden');
+        card.style.animation = 'none';
+        card.offsetHeight;
+        card.style.animation = 'fadeSlideIn .35s ease forwards';
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+  });
+});
+
+/* ─── Contact form ────────────────────────────────────────────────── */
+const form    = document.getElementById('contact-form');
+const success = document.getElementById('form-success');
+
+if (form) form.addEventListener('submit', e => {
+  e.preventDefault();
+  const btn = form.querySelector('button[type="submit"]');
+  btn.textContent = 'Envoi en cours…';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    if (success) success.classList.add('visible');
+    form.reset();
+    btn.textContent = 'Envoyer le message ›';
+    btn.disabled = false;
+    if (success) setTimeout(() => success.classList.remove('visible'), 5000);
+  }, 1200);
+});
+
+/* ─── Particle generator ─────────────────────────────────────────── */
+function createParticles() {
+  const container = document.getElementById('particles');
+  if (!container) return;
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    p.style.left              = Math.random() * 100 + '%';
+    p.style.width             = (Math.random() * 3 + 1) + 'px';
+    p.style.height            = p.style.width;
+    p.style.animationDuration = (Math.random() * 12 + 8) + 's';
+    p.style.animationDelay    = (Math.random() * 10) + 's';
+    p.style.opacity           = Math.random() * 0.5 + 0.1;
+    container.appendChild(p);
+  }
+}
+createParticles();
+
+/* ─── Scroll reveal ──────────────────────────────────────────────── */
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+function observeCards() {
+  document.querySelectorAll(
+    '.game-card, .game-full-card, .blog-article, .team-card, .mj-card, .event-content, .ci-block'
+  ).forEach(el => {
+    if (el.dataset.observed) return;
+    el.dataset.observed = '1';
+    el.style.opacity   = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity .5s ease, transform .5s ease';
+    revealObserver.observe(el);
+  });
+}
+observeCards();
+
+const pageObserver = new MutationObserver(() => observeCards());
+pages.forEach(p => pageObserver.observe(p, { attributes: true, attributeFilter: ['class'] }));
+
+/* ─── Keyboard navigation ─────────────────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    navMenu.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+  }
+});
+
+/* ─── CSS animation for filter ───────────────────────────────────── */
+const animStyle = document.createElement('style');
+animStyle.textContent = `
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+`;
+document.head.appendChild(animStyle);
+
+/* ══════════════════════════════════════════════════════════════════
+   MODAL INSCRIPTION
+══════════════════════════════════════════════════════════════════ */
+(function initInscriptionModal() {
+  const overlay   = document.getElementById('inscription-overlay');
+  const insForm   = document.getElementById('inscription-form');
+  const titleEl   = document.getElementById('inscription-event-title');
+  const cancelBtn = document.getElementById('inscription-cancel');
+  const errEl     = document.getElementById('ins-error');
+  if (!overlay || !insForm || !titleEl || !cancelBtn || !errEl) {
+    console.error('initInscriptionModal: missing DOM elements');
+    return;
+  }
+  let currentEventId    = null;
+  let currentEventTitle = null;
+
+  function openModal(eventId, eventTitle) {
+    currentEventId    = eventId;
+    currentEventTitle = eventTitle;
+    titleEl.textContent = eventTitle || '';
+    insForm.reset();
+    populateTableCheckboxes(eventId);
+    errEl.hidden = true;
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    currentEventId = null;
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-inscrire');
+    if (btn) openModal(btn.dataset.eventId, btn.dataset.eventTitle);
+  });
+
+  cancelBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  insForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const name  = document.getElementById('ins-name').value.trim();
+    const email = document.getElementById('ins-email').value.trim();
+    if (!name || !email) { errEl.hidden = false; return; }
+
+    const reg = {
+      id:         'reg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      eventId:    currentEventId,
+      eventTitle: currentEventTitle,
+      name,
+      email,
+      firstTime:  document.getElementById('ins-firsttime').checked,
+      univers:    Array.from(document.querySelectorAll('#ins-univers-list input:checked')).map(cb => cb.value).join(', '),
+      createdAt:  new Date().toISOString()
+    };
+
+    _data.registrations.push(reg);
+    fetch('/data/registrations.json', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(_data.registrations)
+    }).catch(() => {
+      try { localStorage.setItem('rr_registrations', JSON.stringify(_data.registrations)); } catch {}
+    });
+
+    const savedEventId = currentEventId;
+    closeModal();
+    refreshSpots(savedEventId);
+    const ok = document.createElement('div');
+    ok.className = 'ins-success-toast';
+    ok.textContent = '✓ Inscription enregistrée !';
+    document.body.appendChild(ok);
+    setTimeout(() => ok.remove(), 3500);
+  });
+})();
