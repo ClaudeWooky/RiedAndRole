@@ -1,5 +1,8 @@
+# Données utilisateur (persistées via volume Railway en production)
 data/
+
+# Credentials — ne jamais versionner
 config.json
+
+# Dépendances
 node_modules/
-# accounts.json contains hashed passwords — keep out of version control
-data/accounts.json

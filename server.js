@@ -4,17 +4,25 @@ const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const DATA = path.join(ROOT, 'data');
+const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
 
-/* ── Super-admin (config.json — never served) ────────────────────── */
+/* ── Ensure data directory exists ────────────────────────────────── */
+fs.mkdirSync(DATA, { recursive: true });
+
+/* ── Super-admin : config.json → variables d'environnement ──────── */
 let _super = { adminUser: '', adminPass: '' };
 try {
   _super = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
   console.log('✓  config.json chargé');
 } catch {
-  console.warn('⚠  config.json introuvable — super-admin désactivé');
+  if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
+    _super = { adminUser: process.env.ADMIN_USER, adminPass: process.env.ADMIN_PASS };
+    console.log('✓  Credentials chargés depuis les variables d\'environnement');
+  } else {
+    console.warn('⚠  Aucun credential configuré — super-admin désactivé');
+  }
 }
 
 /* ── Sessions (in-memory, lost on server restart) ────────────────── */
@@ -253,7 +261,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`✓  Ried & Rôle  →  http://localhost:${PORT}`);
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    console.log(`✓  Public URL  →  https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+  }
   console.log('   Ctrl+C pour arrêter');
 });
