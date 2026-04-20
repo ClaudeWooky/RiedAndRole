@@ -98,10 +98,10 @@
             <form id="form-events" novalidate>
 
               <p class="form-section-title">Date de début *</p>
-              <div class="form-row">
+              <div class="form-row form-row--date">
                 <div class="form-group">
                   <label>Jour *</label>
-                  <input type="text" name="startDay" placeholder="10" maxlength="2" required />
+                  <input type="text" name="startDay" placeholder="00" maxlength="2" required />
                 </div>
                 <div class="form-group">
                   <label>Mois *</label>
@@ -115,25 +115,25 @@
                 </div>
                 <div class="form-group">
                   <label>Année *</label>
-                  <input type="text" name="startYear" placeholder="2026" maxlength="4" required />
+                  <input type="text" name="startYear" placeholder="0000" maxlength="4" required />
                 </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
                   <label>Heure de début</label>
-                  <input type="text" name="startTimeFrom" placeholder="10h00" />
+                  <input type="text" name="startTimeFrom" placeholder="00h00" />
                 </div>
                 <div class="form-group">
                   <label>Heure de fin</label>
-                  <input type="text" name="startTimeTo" placeholder="22h00" />
+                  <input type="text" name="startTimeTo" placeholder="00h00" />
                 </div>
               </div>
 
               <p class="form-section-title">Date de fin <small>(optionnelle)</small></p>
-              <div class="form-row">
+              <div class="form-row form-row--date">
                 <div class="form-group">
                   <label>Jour</label>
-                  <input type="text" name="endDay" placeholder="12" maxlength="2" />
+                  <input type="text" name="endDay" placeholder="00" maxlength="2" />
                 </div>
                 <div class="form-group">
                   <label>Mois</label>
@@ -147,29 +147,29 @@
                 </div>
                 <div class="form-group">
                   <label>Année</label>
-                  <input type="text" name="endYear" placeholder="2026" maxlength="4" />
+                  <input type="text" name="endYear" placeholder="0000" maxlength="4" />
                 </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
                   <label>Heure de début</label>
-                  <input type="text" name="endTimeFrom" placeholder="10h00" />
+                  <input type="text" name="endTimeFrom" placeholder="00h00" />
                 </div>
                 <div class="form-group">
                   <label>Heure de fin</label>
-                  <input type="text" name="endTimeTo" placeholder="22h00" />
+                  <input type="text" name="endTimeTo" placeholder="00h00" />
                 </div>
               </div>
 
               <div class="form-group">
                 <label>Titre *</label>
-                <input type="text" name="title" placeholder="Convention Printanière 2026" required />
+                <input type="text" name="title" placeholder="-" required />
               </div>
 
               <div class="form-row">
                 <div class="form-group">
                   <label>Étiquette</label>
-                  <input type="text" name="tag" placeholder="Événement phare" />
+                  <input type="text" name="tag" placeholder="-" />
                 </div>
                 <div class="form-group">
                   <label>Couleur</label>
@@ -191,11 +191,11 @@
               <div class="form-row">
                 <div class="form-group">
                   <label>Lieu</label>
-                  <input type="text" name="location" placeholder="Salle des fêtes de Rhinau" />
+                  <input type="text" name="location" placeholder="Local Ried&amp;Rôle" />
                 </div>
                 <div class="form-group">
                   <label>Capacité</label>
-                  <input type="text" name="capacity" placeholder="150 personnes" />
+                  <input type="text" name="capacity" placeholder="0 personnes" />
                 </div>
               </div>
 
@@ -244,7 +244,16 @@
             <form id="form-games" novalidate>
               <div class="form-group">
                 <label>Titre du jeu *</label>
-                <input type="text" name="title" placeholder="Donjons &amp; Dragons 5e" required />
+                <input type="text" name="title" placeholder="-" required />
+              </div>
+
+              <div class="form-group">
+                <label>Image <small>(optionnelle)</small></label>
+                <input type="file" id="game-image-input" accept="image/*" />
+                <div id="game-image-preview" style="display:none; margin-top:.6rem;">
+                  <img id="game-image-img" src="" alt="Aperçu" class="game-preview-img" />
+                  <button type="button" id="game-image-clear" class="btn-photo-clear">&#10005; Supprimer l'image</button>
+                </div>
               </div>
 
               <div class="form-group">
@@ -277,7 +286,7 @@
 
               <div class="form-group">
                 <label>Points clés <small>(séparés par des virgules)</small></label>
-                <input type="text" name="badges" placeholder="Débutants bienvenus, Campagnes longues" />
+                <input type="text" name="badges" placeholder="-" />
               </div>
 
               <div class="form-group form-check">
@@ -572,7 +581,8 @@
     <div class="modal-card modal-card-wide">
       <h3 class="modal-title">Inscriptions — <span id="reg-event-title"></span></h3>
       <div id="reg-list" class="reg-list"></div>
-      <div class="modal-actions" style="margin-top:1.5rem;">
+      <div class="modal-actions" style="margin-top:1.5rem; display:flex; gap:.75rem;">
+        <button type="button" id="reg-save" class="btn btn-outline">&#128190; Sauvegarder</button>
         <button type="button" id="reg-close" class="btn btn-primary">Fermer</button>
       </div>
     </div>

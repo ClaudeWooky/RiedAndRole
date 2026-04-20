@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "acc_1776673576044_e80b1b85",
+    "login": "christophe.zittel@gmail.com",
+    "passwordHash": "cb8e77b723ec42fb1452160be57abf41ed4b57c98d70178497424233390c7470e638a9c9799f9ef3989e40ebd7700c954f59df5e75b63efe25d0f8341e878d37",
+    "salt": "2e7562b5b8b2d7709b68c7bcce63400d",
+    "fullName": "Zitou",
+    "permissions": [
+      "evenements",
+      "jeux",
+      "equipe",
+      "blog",
+      "site"
+    ]
+  }
+]

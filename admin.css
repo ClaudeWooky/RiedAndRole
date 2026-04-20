@@ -211,6 +211,15 @@ ul { list-style: none; }
 .btn-photo-clear:hover { background: rgba(239,68,68,.3); }
 #member-photo-preview { display: flex; align-items: center; gap: 1rem; }
 
+.game-preview-img {
+  width: 160px;
+  height: 70px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+}
+#game-image-preview { display: flex; align-items: center; gap: 1rem; }
+
 /* ══════════════════════════════════════════════════════════════════
    LOGIN SCREEN
 ══════════════════════════════════════════════════════════════════ */
@@ -348,6 +357,7 @@ ul { list-style: none; }
 .form-group textarea { resize: vertical; min-height: 80px; }
 .form-group select { cursor: pointer; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .75rem; }
+.form-row--date { display: grid; grid-template-columns: 60px 1fr 85px; gap: .75rem; }
 .form-check label {
   display: flex;
   align-items: center;

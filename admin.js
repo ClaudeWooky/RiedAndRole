@@ -16,7 +16,9 @@ let editingEventId   = null;
 let editingGameId    = null;
 let editingBlogId    = null;
 let editingAccountId = null;
-let currentPhotoData = null;
+let currentPhotoData     = null;
+let currentGameImageData = null;
+let gameImageCleared     = false;
 
 /* ─── STORAGE KEYS (= file base names in data/) ──────────────────── */
 const KEYS = {
@@ -67,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindGameCategoryAutoFill();
   bindMemberTypeToggle();
   bindPhotoInput();
+  bindGameImageInput();
   bindForms();
   bindBlogForm();
   bindSiteForm();
@@ -264,12 +267,19 @@ function bindForms() {
       tagColor:    cat.color,
       icon:        cat.icon,
       gradient:    cat.gradient,
+      image:       currentGameImageData || null,
       description: data.description,
       badges:      data.badges ? data.badges.split(',').map(s => s.trim()).filter(Boolean) : [],
       popular:     data.popular === 'on'
     };
 
     if (editingGameId) {
+      if (currentGameImageData !== null) {
+        item.image = currentGameImageData;
+      } else if (!gameImageCleared) {
+        const existing = getData(KEYS.games).find(g => g.id === editingGameId);
+        item.image = existing ? (existing.image || null) : null;
+      }
       const items = getData(KEYS.games).map(g =>
         g.id === editingGameId ? { ...g, ...item, id: editingGameId } : g
       );
@@ -280,6 +290,7 @@ function bindForms() {
     } else {
       prepend(KEYS.games, item);
       e.target.reset();
+      _clearGameImage();
       renderGames();
       showToast('Jeu ajouté !');
     }
@@ -370,6 +381,46 @@ function bindPhotoInput() {
 
   clearBtn.addEventListener('click', () => {
     currentPhotoData = null;
+    input.value = '';
+    img.src = '';
+    preview.style.display = 'none';
+  });
+}
+
+/* ─── Game image input ───────────────────────────────────────────── */
+function _clearGameImage() {
+  currentGameImageData = null;
+  gameImageCleared     = false;
+  const input   = document.getElementById('game-image-input');
+  const preview = document.getElementById('game-image-preview');
+  const img     = document.getElementById('game-image-img');
+  if (input)   input.value = '';
+  if (img)     img.src = '';
+  if (preview) preview.style.display = 'none';
+}
+
+function bindGameImageInput() {
+  const input    = document.getElementById('game-image-input');
+  const preview  = document.getElementById('game-image-preview');
+  const img      = document.getElementById('game-image-img');
+  const clearBtn = document.getElementById('game-image-clear');
+
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      currentGameImageData = e.target.result;
+      gameImageCleared     = false;
+      img.src = currentGameImageData;
+      preview.style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    currentGameImageData = null;
+    gameImageCleared     = true;
     input.value = '';
     img.src = '';
     preview.style.display = 'none';
@@ -815,6 +866,19 @@ function populateGameForm(item) {
   set('badges',      Array.isArray(item.badges) ? item.badges.join(', ') : (item.badges || ''));
   chk('popular',     item.popular);
 
+  currentGameImageData = null;
+  gameImageCleared     = false;
+  const imgEl      = document.getElementById('game-image-img');
+  const previewEl  = document.getElementById('game-image-preview');
+  const inputEl    = document.getElementById('game-image-input');
+  if (inputEl) inputEl.value = '';
+  if (item.image && imgEl && previewEl) {
+    imgEl.src = item.image;
+    previewEl.style.display = 'flex';
+  } else if (previewEl) {
+    previewEl.style.display = 'none';
+  }
+
   const submitBtn = form.querySelector('button[type="submit"]');
   submitBtn.textContent = 'Enregistrer les modifications';
 
@@ -835,6 +899,7 @@ function cancelGameEdit() {
   editingGameId = null;
   const form = document.getElementById('form-games');
   form.reset();
+  _clearGameImage();
   form.querySelector('button[type="submit"]').textContent = 'Ajouter le jeu';
   const cancelBtn = form.querySelector('.btn-cancel-edit');
   if (cancelBtn) cancelBtn.remove();
@@ -1284,7 +1349,12 @@ function getRegistrationCount(eventId) {
   return getRegistrations(eventId).length;
 }
 
+let _currentRegEventId    = null;
+let _currentRegEventTitle = null;
+
 function openRegistrationsModal(eventId, eventTitle) {
+  _currentRegEventId    = eventId;
+  _currentRegEventTitle = eventTitle;
   document.getElementById('reg-event-title').textContent = eventTitle;
   const regs = getRegistrations(eventId);
   const list = document.getElementById('reg-list');
@@ -1326,6 +1396,32 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('reg-overlay'))
       document.getElementById('reg-overlay').hidden = true;
   });
+
+  document.getElementById('reg-save').addEventListener('click', () => {
+    const regs = getRegistrations(_currentRegEventId);
+    if (!regs.length) { showToast('Aucune inscription à sauvegarder.', true); return; }
+
+    const pad  = (s, n) => String(s).padEnd(n);
+    const lines = [
+      `Inscriptions — ${_currentRegEventTitle}`,
+      `Exporté le ${new Date().toLocaleString('fr-FR')}`,
+      '',
+      `${'#'.padEnd(4)}  ${'Nom'.padEnd(30)}  ${'Email'.padEnd(40)}  Débutant`,
+      '─'.repeat(90),
+      ...regs.map((r, i) =>
+        `${pad(i + 1, 4)}  ${pad(r.name, 30)}  ${pad(r.email, 40)}  ${r.firstTime ? 'Oui' : 'Non'}`
+      )
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `inscriptions_${_currentRegEventTitle.replace(/\s+/g, '_').toLowerCase()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
   bindTableModal();
 });
 

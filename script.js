@@ -75,6 +75,7 @@ function loadHomeGames() {
     <div class="game-card${g.popular ? ' featured-card' : ''}">
       ${g.popular ? '<div class="ribbon">Populaire</div>' : ''}
       <div class="game-card-img" style="background:${escHtml(g.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)')};">
+        ${g.image ? `<img class="game-card-bg-img" src="${escHtml(g.image)}" alt="">` : ''}
         <div class="game-card-icon">${escHtml(g.icon || '⚔')}</div>
       </div>
       <div class="game-card-body">
@@ -368,6 +369,7 @@ function loadDynamicGames() {
   container.innerHTML = games.map(g => `
   <div class="game-full-card" id="game-${escHtml(g.id)}" data-cat="${escHtml(g.category)}">
     <div class="gfc-left" style="background:${escHtml(g.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)')};">
+      ${g.image ? `<img class="gfc-bg-img" src="${escHtml(g.image)}" alt="">` : ''}
       <div class="gfc-icon">${escHtml(g.icon || '⚔')}</div>
       <span class="tag tag-${escHtml(g.tagColor)}">${escHtml(g.tag)}</span>
     </div>
