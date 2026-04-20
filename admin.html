@@ -366,8 +366,8 @@
               </div>
 
               <div class="form-group" id="games-group" style="display:none">
-                <label>Jeux pratiqués <small>(séparés par des virgules)</small></label>
-                <input type="text" name="games" placeholder="D&amp;D 5e, GURPS, Shadowrun" />
+                <label>Jeux pratiqués <small>(Ctrl+clic pour sélection multiple)</small></label>
+                <select id="games-select" multiple size="5"></select>
               </div>
 
               <div class="form-group">
@@ -605,11 +605,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>Joueurs min *</label>
-            <input type="number" id="table-players-min" min="1" max="20" placeholder="2" required>
+            <input type="number" id="table-players-min" min="1" max="20" placeholder="0" required>
           </div>
           <div class="form-group">
             <label>Joueurs max *</label>
-            <input type="number" id="table-players-max" min="1" max="20" placeholder="6" required>
+            <input type="number" id="table-players-max" min="1" max="20" placeholder="0" required>
           </div>
         </div>
 
@@ -625,7 +625,9 @@
 
         <div class="form-group">
           <label>Maître de jeu <small>(optionnel)</small></label>
-          <input type="text" id="table-gm" placeholder="Nom ou pseudo du MJ…">
+          <select id="table-gm">
+            <option value="">— Aucun —</option>
+          </select>
         </div>
 
         <div class="form-group">

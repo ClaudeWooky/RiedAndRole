@@ -356,6 +356,9 @@ ul { list-style: none; }
 }
 .form-group textarea { resize: vertical; min-height: 80px; }
 .form-group select { cursor: pointer; }
+#games-select { min-height: 130px; padding: .3rem 0; }
+#games-select option { padding: .35rem .9rem; cursor: pointer; }
+#games-select option:checked { background: var(--accent); color: #0a0a0a; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .75rem; }
 .form-row--date { display: grid; grid-template-columns: 60px 1fr 85px; gap: .75rem; }
 .form-check label {
@@ -559,6 +562,14 @@ ul { list-style: none; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.admin-item-meta-label {
+  font-size: .7rem;
+  color: var(--text-muted);
+  font-family: 'Rajdhani', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-right: .4rem;
 }
 
 .admin-item-badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .35rem; }

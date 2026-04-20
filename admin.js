@@ -324,7 +324,7 @@ function bindForms() {
           roleBadge:   data.roleBadge || data.role.split('&')[0].trim(),
           mjStyle:     data.mjStyle || '',
           bio:         data.bio || '',
-          games:       data.games ? data.games.split(',').map(s => s.trim()).filter(Boolean) : [],
+          games:       getSelectedGames(),
           gradient:    data.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
           type:        data.type || 'bureau',
           isPresident: data.isPresident === 'on'
@@ -344,7 +344,7 @@ function bindForms() {
         roleBadge:   data.roleBadge || data.role.split('&')[0].trim(),
         mjStyle:     data.mjStyle || '',
         bio:         data.bio || '',
-        games:       data.games ? data.games.split(',').map(s => s.trim()).filter(Boolean) : [],
+        games:       getSelectedGames(),
         gradient:    data.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
         type:        data.type || 'bureau',
         isPresident: data.isPresident === 'on'
@@ -354,6 +354,7 @@ function bindForms() {
       currentPhotoData = null;
       document.getElementById('member-photo-preview').style.display = 'none';
       document.getElementById('member-photo-img').src = '';
+      Array.from(document.getElementById('games-select').options).forEach(o => o.selected = false);
       renderTeam();
       showToast('Membre ajouté !');
     }
@@ -467,6 +468,26 @@ function bindGameCategoryAutoFill() {
   // tag/color/icon are now fully derived from category at save time — nothing to bind
 }
 
+/* ─── Populate games multi-select from catalog ───────────────────── */
+function populateGamesSelect(selectedGames) {
+  const sel = document.getElementById('games-select');
+  if (!sel) return;
+  const prev = selectedGames || Array.from(sel.selectedOptions).map(o => o.value);
+  sel.innerHTML = '';
+  getData(KEYS.games).forEach(g => {
+    const opt = document.createElement('option');
+    opt.value       = g.title;
+    opt.textContent = g.title;
+    opt.selected    = prev.includes(g.title);
+    sel.appendChild(opt);
+  });
+}
+
+function getSelectedGames() {
+  const sel = document.getElementById('games-select');
+  return sel ? Array.from(sel.selectedOptions).map(o => o.value) : [];
+}
+
 /* ─── Show/hide MJ style field based on type select ──────────────── */
 function bindMemberTypeToggle() {
   const typeSelect      = document.getElementById('member-type');
@@ -481,6 +502,7 @@ function bindMemberTypeToggle() {
     gamesGroup.style.display     = isMJ ? 'block' : 'none';
     roleBadgeGroup.style.display = isMJ ? 'none'  : '';
     roleInput.required           = !isMJ;
+    if (isMJ) populateGamesSelect();
   });
 }
 
@@ -638,7 +660,18 @@ function _resetTableModal(eventId, eventTitle) {
   document.getElementById('form-table').reset();
   document.getElementById('table-tags-list').innerHTML = '';
   document.getElementById('table-tag-input').value = '';
-  document.getElementById('table-gm').value = '';
+
+  const gmSel = document.getElementById('table-gm');
+  gmSel.innerHTML = '<option value="">— Aucun —</option>';
+  getData(KEYS.team)
+    .filter(m => m.type === 'mj')
+    .forEach(m => {
+      const opt = document.createElement('option');
+      opt.value       = m.name;
+      opt.textContent = m.name;
+      gmSel.appendChild(opt);
+    });
+
   const errEl = document.getElementById('table-form-error');
   errEl.hidden = true;
   errEl.textContent = '';
@@ -917,7 +950,19 @@ function renderTeam() {
     return;
   }
 
-  list.innerHTML = items.map(item => `
+  const gamesCatalog = getData(KEYS.games);
+
+  list.innerHTML = items.map(item => {
+    const isMJ = item.type === 'mj';
+    const gameBadges = isMJ && item.games && item.games.length
+      ? item.games.map(title => {
+          const g = gamesCatalog.find(x => x.title === title);
+          const color = g ? esc(g.tagColor) : 'slate';
+          return `<span class="admin-item-badge badge-${color}">${esc(title)}</span>`;
+        }).join('')
+      : '';
+
+    return `
     <div class="admin-item">
       <div class="admin-item-info">
         <div class="admin-item-title">
@@ -926,15 +971,17 @@ function renderTeam() {
         </div>
         <div class="admin-item-meta">${esc(item.role)}</div>
         <div class="admin-item-badges">
-          <span class="admin-item-badge badge-${item.type === 'bureau' ? 'bureau' : 'mj'}">${item.type === 'bureau' ? 'Bureau' : 'Maître du Jeu'}</span>
+          <span class="admin-item-badge badge-${isMJ ? 'mj' : 'bureau'}">${isMJ ? 'Maître du Jeu' : 'Bureau'}</span>
           ${item.isPresident ? '<span class="admin-item-badge badge-orange">★ Président</span>' : ''}
         </div>
+        ${gameBadges ? `<div class="admin-item-badges"><span class="admin-item-meta-label">Jeux pratiqués&nbsp;:</span>${gameBadges}</div>` : ''}
       </div>
       <div class="admin-item-actions">
         <button class="btn-edit" data-edit="${esc(item.id)}">Modifier</button>
         <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.team}">Supprimer</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   bindDeleteButtons(list, KEYS.team, renderTeam);
   bindEditTeamButtons(list);
@@ -956,11 +1003,11 @@ function populateTeamForm(item) {
   form.querySelector('[name="role"]').value      = item.role || '';
   form.querySelector('[name="roleBadge"]').value = item.roleBadge || '';
   form.querySelector('[name="bio"]').value       = item.bio || '';
-  form.querySelector('[name="games"]').value     = (item.games || []).join(', ');
   form.querySelector('[name="gradient"]').value  = item.gradient || '';
   form.querySelector('[name="type"]').value      = item.type || 'bureau';
   form.querySelector('[name="isPresident"]').checked = !!item.isPresident;
   document.getElementById('member-type').dispatchEvent(new Event('change'));
+  populateGamesSelect(item.games || []);
 
   currentPhotoData = null;
   const preview = document.getElementById('member-photo-preview');
@@ -999,6 +1046,7 @@ function cancelTeamEdit() {
   if (cancelBtn) cancelBtn.remove();
   document.getElementById('member-photo-preview').style.display = 'none';
   document.getElementById('member-photo-img').src = '';
+  Array.from(document.getElementById('games-select').options).forEach(o => o.selected = false);
   document.getElementById('member-type').dispatchEvent(new Event('change'));
 }
 
