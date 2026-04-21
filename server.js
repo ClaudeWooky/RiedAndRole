@@ -36,7 +36,7 @@ function smtpPort()   { return parseInt(process.env.SMTP_PORT   || _cfg.smtpPort
 function smtpSecure() { return (process.env.SMTP_SECURE || String(_cfg.smtpSecure || 'false')) === 'true'; }
 function smtpUser()   { return process.env.SMTP_USER   || _cfg.smtpUser   || ''; }
 function smtpPass()   { return process.env.SMTP_PASS   || _cfg.smtpPass   || ''; }
-function smtpFrom()   { return process.env.SMTP_FROM   || _cfg.smtpFrom   || `"Ried & Rôle" <${smtpUser()}>`; }
+function smtpFrom()   { return process.env.SMTP_FROM   || _cfg.smtpFrom   || (smtpUser() ? `"Ried & Rôle" <${smtpUser()}>` : '"Ried & Rôle" <ried.and.role@gmail.com>'); }
 function sgKey()      { return process.env.SENDGRID_API_KEY || _cfg.sendgridApiKey || ''; }
 
 function isEmailConfigured() { return !!(sgKey() || (nodemailer && smtpHost())); }
@@ -50,6 +50,8 @@ function _parsedFrom() {
 async function sendEmail({ to, subject, html, replyTo }) {
   if (sgKey()) {
     const from = _parsedFrom();
+    if (!from.email) throw new Error('Adresse expéditeur manquante (SMTP_FROM non configuré)');
+    console.log(`[email] SendGrid → ${to} | from: ${from.email} | sujet: ${subject.slice(0, 60)}`);
     const body = JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
       from,
@@ -73,7 +75,10 @@ async function sendEmail({ to, subject, html, replyTo }) {
         res.on('end', () => {
           if (res.statusCode >= 400) {
             reject(new Error(`SendGrid ${res.statusCode}: ${d}`));
-          } else resolve();
+          } else {
+            console.log(`[email] SendGrid OK (${res.statusCode}) → ${to}`);
+            resolve();
+          }
         });
       });
       req.on('error', reject);
