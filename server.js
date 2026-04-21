@@ -346,21 +346,7 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
 
-      if (!isEmailConfigured()) {
-        res.writeHead(501, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Service email non configuré' }));
-        return;
-      }
-
-      const { type, message, details, anchor } = JSON.parse(await readBody(req));
-      const subsFile = path.join(DATA, 'subscriptions.json');
-      let subs = [];
-      try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
-      if (!subs.length) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, sent: 0 }));
-        return;
-      }
+      const { type, message, details, anchor, eventId } = JSON.parse(await readBody(req));
 
       const siteUrl  = process.env.RAILWAY_PUBLIC_DOMAIN
         ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -386,10 +372,7 @@ const server = http.createServer(async (req, res) => {
           }</ul>`
         : '';
 
-      let sent = 0, subsChanged = false;
-      for (const sub of subs) {
-        const unsubUrl = `${siteUrl}/unsubscribe?token=${encodeURIComponent(sub.token || sub.id)}`;
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
+      const buildHtml = (unsubUrl, unsubLabel) => `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
 <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
   <div style="background:#0e0c1a;padding:1.5rem 2rem;">
     <p style="color:#e8a020;margin:0;font-size:1.3rem;font-weight:700;">&#9670; Ried &amp; R&ocirc;le</p>
@@ -403,21 +386,67 @@ const server = http.createServer(async (req, res) => {
     <p style="font-size:.75rem;color:#999;margin:0;line-height:1.6;">
       Vous recevez cet e-mail car vous êtes abonné aux notifications de
       <a href="${siteUrl}" style="color:#e8a020;text-decoration:none;">Ried &amp; Rôle</a>.<br>
-      <a href="${unsubUrl}" style="color:#999;">Se désabonner</a>
+      <a href="${unsubUrl}" style="color:#999;">${unsubLabel}</a>
     </p>
   </div>
 </div></body></html>`;
 
-        try {
-          await sendEmail({ to: sub.email, subject: `[Ried & Rôle] ${message}`, html });
-          sent++;
-          sub.notifCount = (sub.notifCount || 0) + 1;
-          subsChanged = true;
-        } catch (err) {
-          console.error(`Email non envoyé à ${sub.email}:`, err.message);
+      let sent = 0;
+
+      // ── Abonnés généraux ──────────────────────────────────────────
+      const subsFile = path.join(DATA, 'subscriptions.json');
+      let subs = [];
+      try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
+      if (subs.length) {
+        for (const sub of subs) sub.notifCount = (sub.notifCount || 0) + 1;
+        fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
+        if (isEmailConfigured()) {
+          for (const sub of subs) {
+            const html = buildHtml(
+              `${siteUrl}/unsubscribe?token=${encodeURIComponent(sub.token || sub.id)}`,
+              'Se désabonner'
+            );
+            try { await sendEmail({ to: sub.email, subject: `[Ried & Rôle] ${message}`, html }); sent++; }
+            catch (err) { console.error(`Email non envoyé à ${sub.email}:`, err.message); }
+          }
         }
       }
-      if (subsChanged) fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
+
+      // ── Abonnés spécifiques à l'événement ─────────────────────────
+      if (eventId) {
+        const evtSubsFile = path.join(DATA, 'event_notif_subs.json');
+        let evtSubs = [];
+        try { evtSubs = JSON.parse(fs.readFileSync(evtSubsFile, 'utf8')); } catch {}
+
+        if (type === 'event_deleted') {
+          // Notifier + supprimer tous les abonnés de cet événement
+          const relevant = evtSubs.filter(s => s.eventId === eventId);
+          if (isEmailConfigured()) {
+            for (const sub of relevant) {
+              await sendEvtSubClosingEmail(sub, siteUrl, 'deleted');
+              sent++;
+            }
+          }
+          if (relevant.length) fs.writeFileSync(evtSubsFile, JSON.stringify(evtSubs.filter(s => s.eventId !== eventId)), 'utf8');
+
+        } else if (['event_added', 'event_modified', 'table_added'].includes(type)) {
+          const relevant = evtSubs.filter(s => s.eventId === eventId && s.eventMs > Date.now());
+          if (relevant.length) {
+            for (const sub of relevant) sub.notifCount = (sub.notifCount || 0) + 1;
+            fs.writeFileSync(evtSubsFile, JSON.stringify(evtSubs), 'utf8');
+            if (isEmailConfigured()) {
+              for (const sub of relevant) {
+                const html = buildHtml(
+                  `${siteUrl}/event-notif-unsubscribe?token=${encodeURIComponent(sub.token)}`,
+                  'Se désabonner des rappels de cet événement'
+                );
+                try { await sendEmail({ to: sub.email, subject: `[Ried & Rôle] ${message}`, html }); sent++; }
+                catch (err) { console.error(`Email non envoyé à ${sub.email}:`, err.message); }
+              }
+            }
+          }
+        }
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, sent }));
@@ -639,6 +668,38 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/* ── Email simple pour abonnés événement (annulation / passé) ───── */
+async function sendEvtSubClosingEmail(sub, siteUrl, reason) {
+  const isDeleted = reason === 'deleted';
+  const icon    = isDeleted ? '🗑️' : '✅';
+  const heading = isDeleted
+    ? `L'événement « ${sub.eventTitle} » a été annulé`
+    : `L'événement « ${sub.eventTitle} » a eu lieu`;
+  const body    = isDeleted
+    ? `L'événement auquel vous souhaitiez assister a malheureusement été annulé. Votre abonnement aux rappels a été retiré automatiquement.`
+    : `Merci pour votre intérêt ! L'événement s'est déroulé et votre abonnement aux rappels a été retiré automatiquement.`;
+  const subject = `[Ried & Rôle] ${heading}`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <div style="background:#0e0c1a;padding:1.5rem 2rem;">
+    <p style="color:#e8a020;margin:0;font-size:1.3rem;font-weight:700;">&#9670; Ried &amp; R&ocirc;le</p>
+    <p style="color:#aaa;margin:.3rem 0 0;font-size:.82rem;">Notification événement</p>
+  </div>
+  <div style="padding:2rem;">
+    <p style="font-size:1.1rem;color:#1a1a2e;margin:0 0 .75rem;">${icon} <strong>${sub.eventTitle}</strong></p>
+    <p style="color:#555;margin:0 0 1.5rem;">${body}</p>
+    <a href="${siteUrl}/#evenements" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.65rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.9rem;">Voir les événements</a>
+  </div>
+</div></body></html>`;
+  try {
+    await sendEmail({ to: sub.email, subject, html });
+    console.log(`[event-notif] ${reason} → ${sub.email} pour "${sub.eventTitle}"`);
+  } catch (err) {
+    console.error(`[event-notif] Erreur email ${sub.email}:`, err.message);
+  }
+}
+
 /* ── Event notification email ────────────────────────────────────── */
 async function sendEventNotifEmail(sub, siteUrl, milestoneNum, hoursLeft) {
   const unsubUrl = `${siteUrl}/event-notif-unsubscribe?token=${encodeURIComponent(sub.token)}`;
@@ -709,7 +770,13 @@ async function checkEventNotifMilestones() {
       }
     }
 
-    // Purge subscriptions for events more than 24h past
+    // Notifier + purger les abonnés dont l'événement est passé (> 1h après le début)
+    const expired = subs.filter(s => s.eventMs && s.eventMs < now - 3600000 && !s.closingEmailSent);
+    for (const sub of expired) {
+      await sendEvtSubClosingEmail(sub, siteUrl, 'past');
+      sub.closingEmailSent = true;
+      changed = true;
+    }
     const active = subs.filter(s => !s.eventMs || s.eventMs > now - 86400000);
     if (changed || active.length !== subs.length) {
       fs.writeFileSync(subsFile, JSON.stringify(active), 'utf8');

@@ -177,6 +177,17 @@ function bindLogout() {
 /* ═══════════════════════════════════════════════════════════════════
    SECTION NAVIGATION
 ═══════════════════════════════════════════════════════════════════ */
+function _fetchAndRenderNotifications() {
+  Promise.all([
+    fetch(`/data/${KEYS.subs}.json`,     { cache: 'no-store' }).then(r => r.ok ? r.json() : []),
+    fetch(`/data/${KEYS.evtnotif}.json`, { cache: 'no-store' }).then(r => r.ok ? r.json() : []),
+  ]).then(([subs, evtnotif]) => {
+    _cache[KEYS.subs]     = subs;
+    _cache[KEYS.evtnotif] = evtnotif;
+    renderNotifications();
+  }).catch(() => renderNotifications());
+}
+
 function _fetchAndRenderAnalytics() {
   const btn = document.getElementById('btn-refresh-analytics');
   if (btn) { btn.textContent = '⟳ …'; btn.disabled = true; }
@@ -201,7 +212,7 @@ function bindSectionNav() {
       document.getElementById('section-' + btn.dataset.section).classList.add('active');
 
       if (btn.dataset.section === 'site') {
-        renderNotifications();
+        _fetchAndRenderNotifications();
         _fetchAndRenderAnalytics();
       }
     });
@@ -247,6 +258,7 @@ function bindForms() {
 
     if (editingEventId) {
       const snap = _eventSnap || {};
+      const _savedEventId = editingEventId;
       const items = getData(KEYS.events).map(ev =>
         ev.id === editingEventId ? { ...ev, ...fields } : ev
       );
@@ -255,10 +267,27 @@ function bindForms() {
       renderEvents();
       showToast('Événement modifié !');
       const changes = diffEvent(snap, fields);
-      if (changes.length) logNotification('event_modified', `L'événement « ${fields.title} » a été modifié`, changes, '#evenements');
+if (changes.length) logNotification('event_modified', `L'événement « ${fields.title} » a été modifié`, changes, '#evenements', _savedEventId);
     } else {
-      prepend(KEYS.events, { id: genId('evt'), ...fields });
-      logNotification('event_added', `Nouvel événement : « ${fields.title} »`, [], '#evenements');
+      const _newEvtId = genId('evt');
+      prepend(KEYS.events, { id: _newEvtId, ...fields });
+      const _evtDetails = [];
+      const _dateDebut = [fields.startDay, fields.startMonth, fields.startYear].filter(Boolean).join(' ');
+      if (_dateDebut) _evtDetails.push(`📅 Date de début : ${_dateDebut}`);
+      if (fields.startTimeFrom) {
+        const _h = fields.startTimeTo ? `${fields.startTimeFrom} → ${fields.startTimeTo}` : fields.startTimeFrom;
+        _evtDetails.push(`🕐 Horaires : ${_h}`);
+      }
+      const _dateFin = [fields.endDay, fields.endMonth, fields.endYear].filter(Boolean).join(' ');
+      if (_dateFin) {
+        const _hFin = fields.endTimeFrom ? ` (${fields.endTimeFrom}${fields.endTimeTo ? ' → ' + fields.endTimeTo : ''})` : '';
+        _evtDetails.push(`📅 Date de fin : ${_dateFin}${_hFin}`);
+      }
+      if (fields.location)  _evtDetails.push(`📍 Lieu : ${fields.location}`);
+      if (fields.capacity)  _evtDetails.push(`👥 Capacité : ${fields.capacity} personnes`);
+      if (fields.inscription) _evtDetails.push(`✅ Inscriptions ouvertes`);
+      if (fields.description) _evtDetails.push(`📝 ${fields.description}`);
+      logNotification('event_added', `Nouvel événement : « ${fields.title} »`, _evtDetails, '#evenements', _newEvtId);
       e.target.reset();
       renderEvents();
       showToast('Événement ajouté !');
@@ -601,7 +630,8 @@ function renderEvents() {
 
   bindDeleteButtons(list, KEYS.events, renderEvents, id => {
     const ev = getData(KEYS.events).find(e => e.id === id);
-    if (ev) logNotification('event_deleted', `L'événement « ${ev.title} » a été supprimé`, [], '#evenements');
+    _cache[KEYS.evtnotif] = getData(KEYS.evtnotif).filter(s => s.eventId !== id);
+    if (ev) logNotification('event_deleted', `L'événement « ${ev.title} » a été supprimé`, [], '#evenements', id);
   });
   list.querySelectorAll('.btn-registrations').forEach(btn => {
     btn.addEventListener('click', () => openRegistrationsModal(btn.dataset.regEvent, btn.dataset.regTitle));
@@ -833,7 +863,7 @@ function bindTableModal() {
     } else {
       prepend(KEYS.tables, { id: genId('tbl'), eventId: _tableModalEventId, ...fields });
       const _ev = getData(KEYS.events).find(e => e.id === _tableModalEventId);
-      logNotification('table_added', `Nouvelle table « ${fields.gameName} »${_ev ? ` à l'événement « ${_ev.title} »` : ''}`, [], '#evenements');
+      logNotification('table_added', `Nouvelle table « ${fields.gameName} »${_ev ? ` à l'événement « ${_ev.title} »` : ''}`, [], '#evenements', _tableModalEventId);
       refreshTableSection(_tableModalEventId);
       overlay.hidden = true;
       showToast('Table ajoutée !');
@@ -1302,7 +1332,7 @@ function renderNotifications() {
     const evtHTML = evtSubs.map(s => `
       <div class="admin-item">
         <div class="admin-item-info">
-          <div class="admin-item-title">&#128276; ${esc(s.email)} <span class="sub-event-badge">${esc(s.eventTitle || '')}</span></div>
+          <div class="admin-item-title">&#128276; ${esc(s.email)} <span class="sub-event-badge">${esc(s.eventTitle || '')}</span>${s.notifCount ? ` <span class="sub-notif-count">${s.notifCount} notif${s.notifCount > 1 ? 's' : ''}</span>` : ''}</div>
           <div class="admin-item-meta">${new Date(s.createdAt).toLocaleString('fr-FR')}</div>
         </div>
         <div class="admin-item-actions">
@@ -1597,7 +1627,7 @@ function diffBlog(snap, neo) {
   return ch;
 }
 
-function logNotification(type, message, details = [], anchor = '') {
+function logNotification(type, message, details = [], anchor = '', eventId = null) {
   const entry = { id: genId('notif'), type, message, createdAt: new Date().toISOString() };
   const items = getData(KEYS.notif).slice();
   items.unshift(entry);
@@ -1607,9 +1637,11 @@ function logNotification(type, message, details = [], anchor = '') {
   fetch('/api/notify', {
     method:  'POST',
     headers: getAuthHeaders(),
-    body:    JSON.stringify({ type, message, details, anchor })
+    body:    JSON.stringify({ type, message, details, anchor, eventId })
   }).then(r => r.json()).then(d => {
-    if (d.ok && d.sent > 0) showToast(`📧 ${d.sent} notification(s) envoyée(s).`);
+    if (!d.ok) return;
+    if (d.sent > 0) showToast(`📧 ${d.sent} notification(s) envoyée(s).`);
+    _fetchAndRenderNotifications();
   }).catch(() => {});
 }
 
