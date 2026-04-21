@@ -634,6 +634,13 @@
             <p>&#128205; Sous la salle polyvalente<br>Rue de Baldenheim<br>67390 Hessenheim</p>
             <p>&#128231; contact@ried-et-role.fr</p>
           </div>
+          <div class="footer-notif">
+            <h5>Notifications</h5>
+            <p class="footer-notif-desc">Nouveau jeu, événement ou article — restez informé !</p>
+            <input type="email" id="notif-email-input" placeholder="votre@email.fr" class="notif-input" />
+            <button type="button" id="btn-subscribe" class="btn btn-primary btn-sm" style="margin-top:.6rem;width:100%;">S'abonner</button>
+            <p class="notif-msg" id="notif-msg" style="display:none;"></p>
+          </div>
         </div>
       </div>
     </div>
@@ -675,6 +682,24 @@
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL ÊTRE NOTIFIÉ  ══════════════ -->
+  <div id="event-notif-overlay" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-title">&#128276; Être notifié</h3>
+      <p id="event-notif-event-title" class="modal-event-title"></p>
+      <p class="modal-desc">Entrez votre adresse e-mail pour recevoir deux rappels avant cet événement.</p>
+      <div class="form-group">
+        <label for="event-notif-email">Adresse e-mail</label>
+        <input type="email" id="event-notif-email" placeholder="votre@email.fr" />
+      </div>
+      <p id="event-notif-msg" class="notif-popup-msg" hidden></p>
+      <div class="modal-actions" style="margin-top:1.5rem;">
+        <button type="button" id="event-notif-cancel" class="btn btn-outline">Annuler</button>
+        <button type="button" id="event-notif-submit" class="btn btn-primary">&#128276; Me notifier</button>
+      </div>
     </div>
   </div>
 

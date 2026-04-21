@@ -22,13 +22,17 @@ let gameImageCleared     = false;
 
 /* ─── STORAGE KEYS (= file base names in data/) ──────────────────── */
 const KEYS = {
-  events: 'events',
-  games:  'games',
-  team:   'team',
-  regs:   'registrations',
-  tables: 'tables',
-  blog:   'blog',
-  site:   'site'
+  events:    'events',
+  games:     'games',
+  team:      'team',
+  regs:      'registrations',
+  tables:    'tables',
+  blog:      'blog',
+  site:      'site',
+  subs:      'subscriptions',
+  evtnotif:  'event_notif_subs',
+  notif:     'notif_log',
+  analytics: 'analytics'
 };
 
 const BLOG_CATS = {
@@ -169,6 +173,21 @@ function bindLogout() {
 /* ═══════════════════════════════════════════════════════════════════
    SECTION NAVIGATION
 ═══════════════════════════════════════════════════════════════════ */
+function _fetchAndRenderAnalytics() {
+  const btn = document.getElementById('btn-refresh-analytics');
+  if (btn) { btn.textContent = '⟳ …'; btn.disabled = true; }
+  fetch('/data/analytics.json', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : {})
+    .then(d => {
+      _cache[KEYS.analytics] = d;
+      renderAnalytics();
+    })
+    .catch(() => renderAnalytics())
+    .finally(() => {
+      if (btn) { btn.textContent = '⟳ Rafraîchir'; btn.disabled = false; }
+    });
+}
+
 function bindSectionNav() {
   document.querySelectorAll('.admin-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -176,8 +195,16 @@ function bindSectionNav() {
       document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('section-' + btn.dataset.section).classList.add('active');
+
+      if (btn.dataset.section === 'site') {
+        renderNotifications();
+        _fetchAndRenderAnalytics();
+      }
     });
   });
+
+  const refreshBtn = document.getElementById('btn-refresh-analytics');
+  if (refreshBtn) refreshBtn.addEventListener('click', _fetchAndRenderAnalytics);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -224,6 +251,7 @@ function bindForms() {
       showToast('Événement modifié !');
     } else {
       prepend(KEYS.events, { id: genId('evt'), ...fields });
+      logNotification('event_added', `Nouvel événement : ${fields.title}`);
       e.target.reset();
       renderEvents();
       showToast('Événement ajouté !');
@@ -289,6 +317,7 @@ function bindForms() {
       showToast('Jeu modifié !');
     } else {
       prepend(KEYS.games, item);
+      logNotification('game_added', `Nouveau jeu de rôle : ${item.title}`);
       e.target.reset();
       _clearGameImage();
       renderGames();
@@ -456,6 +485,7 @@ function bindBlogForm() {
       showToast('Article modifié !');
     } else {
       prepend(KEYS.blog, { id: genId('blog'), ...item });
+      logNotification('blog_added', `Nouvel article : ${item.title}`);
       e.target.reset();
       renderBlog();
       showToast('Article ajouté !');
@@ -557,7 +587,10 @@ function renderEvents() {
       </div>
     </div>`).join('');
 
-  bindDeleteButtons(list, KEYS.events, renderEvents);
+  bindDeleteButtons(list, KEYS.events, renderEvents, id => {
+    const ev = getData(KEYS.events).find(e => e.id === id);
+    if (ev) logNotification('event_deleted', `Événement supprimé : ${ev.title}`);
+  });
   list.querySelectorAll('.btn-registrations').forEach(btn => {
     btn.addEventListener('click', () => openRegistrationsModal(btn.dataset.regEvent, btn.dataset.regTitle));
   });
@@ -787,6 +820,8 @@ function bindTableModal() {
       showToast('Table modifiée !');
     } else {
       prepend(KEYS.tables, { id: genId('tbl'), eventId: _tableModalEventId, ...fields });
+      const _ev = getData(KEYS.events).find(e => e.id === _tableModalEventId);
+      logNotification('table_added', `Nouvelle table ajoutée${_ev ? ` à "${_ev.title}"` : ''} : ${fields.gameName}`);
       refreshTableSection(_tableModalEventId);
       overlay.hidden = true;
       showToast('Table ajoutée !');
@@ -1123,17 +1158,180 @@ function cancelBlogEdit() {
 function getSiteConfig() {
   const v = _cache['site'];
   if (v && !Array.isArray(v) && typeof v === 'object') return v;
-  return { membres: 42, parties: 8, evenements: 15, annees: 6 };
+  return { membres: 42, parties: 8, evenements: 15, annees: 6, milestone1Hours: 168, milestone2Hours: 24 };
 }
 
 function renderSite() {
   const cfg = getSiteConfig();
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
-  set('site-membres',    cfg.membres);
-  set('site-parties',    cfg.parties);
-  set('site-evenements', cfg.evenements);
-  set('site-annees',     cfg.annees);
+  set('site-membres',     cfg.membres);
+  set('site-parties',     cfg.parties);
+  set('site-evenements',  cfg.evenements);
+  set('site-annees',      cfg.annees);
+  set('site-milestone1',  cfg.milestone1Hours ?? 168);
+  set('site-milestone2',  cfg.milestone2Hours ?? 24);
   loadAndRenderAccounts();
+  renderNotifications();
+  renderAnalytics();
+}
+
+/* ─── Analytics ──────────────────────────────────────────────────── */
+function renderAnalytics() {
+  const el = document.getElementById('analytics-panel');
+  if (!el) return;
+
+  const raw = _cache[KEYS.analytics];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    el.innerHTML = '<p class="empty-msg">Aucune donnée disponible.</p>'; return;
+  }
+
+  const PAGE_LABELS = { home:'Accueil', jeux:'Jeux', evenements:'Événements', blog:'Blog', equipe:'Équipe', contacts:'Contacts' };
+  const days = Object.keys(raw).sort().reverse().slice(0, 30);
+
+  if (!days.length) { el.innerHTML = '<p class="empty-msg">Aucune donnée disponible.</p>'; return; }
+
+  const rows = days.map(day => {
+    const d = raw[day];
+    const visitors   = (d.v || []).length;
+    const pageviews  = Object.values(d.p || {}).reduce((s, n) => s + n, 0);
+    const clicks     = Object.values(d.c || {}).reduce((s, n) => s + n, 0);
+    const topPage    = Object.entries(d.p || {}).sort((a, b) => b[1] - a[1])[0];
+    const topLabel   = topPage ? `${PAGE_LABELS[topPage[0]] || topPage[0]} (${topPage[1]})` : '—';
+
+    const pageBreakdown = Object.entries(d.p || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([p, n]) => `<span class="analytics-page-chip">${PAGE_LABELS[p] || p} <strong>${n}</strong></span>`)
+      .join('');
+
+    const clickBreakdown = Object.entries(d.c || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([k, n]) => {
+        const [pg, ...lblParts] = k.split('/');
+        const lbl = lblParts.join('/').trim() || pg;
+        return `<span class="analytics-page-chip analytics-click-chip">${esc(lbl.slice(0,35))} <strong>${n}</strong></span>`;
+      }).join('');
+
+    return `
+      <div class="analytics-day-row">
+        <div class="analytics-day-header" data-toggle>
+          <span class="analytics-date">${day}</span>
+          <span class="analytics-stat"><span class="analytics-stat-label">Visiteurs</span><strong>${visitors}</strong></span>
+          <span class="analytics-stat"><span class="analytics-stat-label">Pages vues</span><strong>${pageviews}</strong></span>
+          <span class="analytics-stat"><span class="analytics-stat-label">Clics</span><strong>${clicks}</strong></span>
+          <span class="analytics-stat analytics-top"><span class="analytics-stat-label">Top page</span>${topLabel}</span>
+          <span class="analytics-toggle-icon">▾</span>
+        </div>
+        <div class="analytics-day-detail" hidden>
+          <div class="analytics-detail-section"><strong>Pages :</strong> ${pageBreakdown || '—'}</div>
+          <div class="analytics-detail-section"><strong>Top clics :</strong> ${clickBreakdown || '—'}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="analytics-summary">
+      <span class="analytics-summary-item">&#128200; <strong>${days.length}</strong> jour(s) de données</span>
+      <span class="analytics-summary-item">&#128101; <strong>${[...new Set(days.flatMap(d => raw[d].v || []))].length}</strong> visiteurs uniques (total)</span>
+    </div>
+    <div class="analytics-table">${rows}</div>`;
+
+  el.querySelectorAll('[data-toggle]').forEach(header => {
+    header.addEventListener('click', () => {
+      const detail = header.nextElementSibling;
+      const icon   = header.querySelector('.analytics-toggle-icon');
+      const open   = !detail.hidden;
+      detail.hidden = open;
+      icon.textContent = open ? '▾' : '▴';
+    });
+  });
+}
+
+/* ─── Notification subscribers + log ────────────────────────────── */
+const NOTIF_ICONS = {
+  game_added:    '🎲',
+  event_added:   '📅',
+  event_deleted: '🗑️',
+  table_added:   '🪑',
+  blog_added:    '📝',
+};
+
+function renderNotifications() {
+  const subs      = getData(KEYS.subs);
+  const evtSubs   = getData(KEYS.evtnotif).filter(s => s.eventMs && s.eventMs > Date.now());
+  const log       = getData(KEYS.notif);
+  const subList   = document.getElementById('list-subscribers');
+  const subCount  = document.getElementById('count-subscribers');
+  const logList   = document.getElementById('list-notif-log');
+  if (!subList || !logList) return;
+
+  subCount.textContent = subs.length + evtSubs.length;
+
+  if (!subs.length && !evtSubs.length) {
+    subList.innerHTML = '<p class="empty-msg">Aucun abonné.</p>';
+  } else {
+    const regularHTML = subs.map(s => `
+      <div class="admin-item">
+        <div class="admin-item-info">
+          <div class="admin-item-title">&#128231; ${esc(s.email)}</div>
+          <div class="admin-item-meta">${new Date(s.createdAt).toLocaleString('fr-FR')}</div>
+        </div>
+        <div class="admin-item-actions">
+          <button class="btn-danger" data-delete-sub="${esc(s.id)}">Supprimer</button>
+        </div>
+      </div>`).join('');
+
+    const evtHTML = evtSubs.map(s => `
+      <div class="admin-item">
+        <div class="admin-item-info">
+          <div class="admin-item-title">&#128276; ${esc(s.email)} <span class="sub-event-badge">${esc(s.eventTitle || '')}</span></div>
+          <div class="admin-item-meta">${new Date(s.createdAt).toLocaleString('fr-FR')}</div>
+        </div>
+        <div class="admin-item-actions">
+          <button class="btn-danger" data-delete-evtsub="${esc(s.id)}">Supprimer</button>
+        </div>
+      </div>`).join('');
+
+    subList.innerHTML = regularHTML + evtHTML;
+
+    subList.querySelectorAll('[data-delete-sub]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filtered = getData(KEYS.subs).filter(s => s.id !== btn.dataset.deleteSub);
+        saveData(KEYS.subs, filtered);
+        renderNotifications();
+        showToast('Abonné supprimé.');
+      });
+    });
+
+    subList.querySelectorAll('[data-delete-evtsub]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filtered = getData(KEYS.evtnotif).filter(s => s.id !== btn.dataset.deleteEvtsub);
+        saveData(KEYS.evtnotif, filtered);
+        renderNotifications();
+        showToast('Abonné supprimé.');
+      });
+    });
+  }
+
+  if (!log.length) {
+    logList.innerHTML = '<p class="empty-msg">Aucune notification enregistrée.</p>';
+  } else {
+    logList.innerHTML = log.map(n => `
+      <div class="notif-log-item">
+        <span class="notif-log-icon">${NOTIF_ICONS[n.type] || '🔔'}</span>
+        <span class="notif-log-msg">${esc(n.message)}</span>
+        <span class="notif-log-date">${new Date(n.createdAt).toLocaleString('fr-FR')}</span>
+      </div>`).join('');
+  }
+
+  const clearBtn = document.getElementById('btn-clear-notif-log');
+  if (clearBtn) {
+    clearBtn.onclick = () => {
+      saveData(KEYS.notif, []);
+      renderNotifications();
+      showToast('Journal effacé.');
+    };
+  }
 }
 
 function bindSiteForm() {
@@ -1142,10 +1340,12 @@ function bindSiteForm() {
   form.addEventListener('submit', e => {
     e.preventDefault();
     const cfg = {
-      membres:    parseInt(document.getElementById('site-membres').value,    10) || 0,
-      parties:    parseInt(document.getElementById('site-parties').value,    10) || 0,
-      evenements: parseInt(document.getElementById('site-evenements').value, 10) || 0,
-      annees:     parseInt(document.getElementById('site-annees').value,     10) || 0,
+      membres:         parseInt(document.getElementById('site-membres').value,     10) || 0,
+      parties:         parseInt(document.getElementById('site-parties').value,     10) || 0,
+      evenements:      parseInt(document.getElementById('site-evenements').value,  10) || 0,
+      annees:          parseInt(document.getElementById('site-annees').value,      10) || 0,
+      milestone1Hours: parseInt(document.getElementById('site-milestone1').value,  10) || 168,
+      milestone2Hours: parseInt(document.getElementById('site-milestone2').value,  10) || 24,
     };
     _cache['site'] = cfg;
     fetch('/data/site.json', {
@@ -1330,11 +1530,29 @@ function bindAccountForm() {
   });
 }
 
+/* ─── Notification log ───────────────────────────────────────────── */
+function logNotification(type, message) {
+  const entry = { id: genId('notif'), type, message, createdAt: new Date().toISOString() };
+  const items = getData(KEYS.notif).slice();
+  items.unshift(entry);
+  saveData(KEYS.notif, items.slice(0, 100));
+  renderNotifications();
+
+  fetch('/api/notify', {
+    method:  'POST',
+    headers: getAuthHeaders(),
+    body:    JSON.stringify({ type, message })
+  }).then(r => r.json()).then(d => {
+    if (d.ok && d.sent > 0) showToast(`📧 ${d.sent} notification(s) envoyée(s).`);
+  }).catch(() => {});
+}
+
 /* ─── Bind delete buttons ────────────────────────────────────────── */
-function bindDeleteButtons(container, key, reRender) {
+function bindDeleteButtons(container, key, reRender, beforeDelete) {
   container.querySelectorAll('.btn-danger[data-delete]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id    = btn.dataset.delete;
+      if (beforeDelete) beforeDelete(id);
       const items = getData(key).filter(item => item.id !== id);
       saveData(key, items);
       reRender();

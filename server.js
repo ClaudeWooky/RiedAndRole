@@ -1,8 +1,10 @@
 'use strict';
-const http   = require('http');
-const fs     = require('fs');
-const path   = require('path');
-const crypto = require('crypto');
+const http       = require('http');
+const fs         = require('fs');
+const path       = require('path');
+const crypto     = require('crypto');
+let nodemailer;
+try { nodemailer = require('nodemailer'); } catch { nodemailer = null; }
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
@@ -85,6 +87,26 @@ function readBody(req, limit = 10240) {
     req.on('end',   () => resolve(body));
     req.on('error', reject);
   });
+}
+
+/* ── Event date helpers ──────────────────────────────────────────── */
+const FR_MON = { Jan:0,'Fév':1,Mar:2,Avr:3,Mai:4,Jun:5,Jul:6,'Aoû':7,Sep:8,Oct:9,Nov:10,'Déc':11 };
+
+function parseEventMs(e) {
+  const day = parseInt(e.startDay || e.day,   10);
+  const mon = FR_MON[e.startMonth || e.month];
+  const yr  = parseInt(e.startYear  || e.year, 10);
+  if (isNaN(day) || mon === undefined || isNaN(yr)) return null;
+  let h = 0, m = 0;
+  const t = (e.startTimeFrom || '').match(/^(\d{1,2})h(\d{2})$/);
+  if (t) { h = +t[1]; m = +t[2]; }
+  return new Date(yr, mon, day, h, m, 0, 0).getTime();
+}
+
+function fmtHours(h) {
+  if (h >= 48) return `${Math.round(h / 24)} jours`;
+  if (h >= 2)  return `${h} heures`;
+  return 'moins d\'une heure';
 }
 
 /* ── MIME types ──────────────────────────────────────────────────── */
@@ -210,17 +232,240 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── POST /api/analytics ───────────────────────────────────────
+    if (pathname === '/api/analytics' && req.method === 'POST') {
+      try {
+        const raw  = await readBody(req, 2048);
+        const body = JSON.parse(raw);
+        const type  = String(body.type  || '').slice(0, 20);
+        const page  = String(body.page  || '').slice(0, 30);
+        const label = String(body.label || '').slice(0, 60);
+        if (!type || !page) { res.writeHead(400); res.end(); return; }
+
+        const today  = new Date().toISOString().slice(0, 10);
+        const rawIp  = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+        const ipHash = crypto.createHash('sha256').update(rawIp + today).digest('hex').slice(0, 16);
+
+        const aFile = path.join(DATA, 'analytics.json');
+        let aData = {};
+        try { aData = JSON.parse(fs.readFileSync(aFile, 'utf8')); } catch {}
+
+        if (!aData[today]) aData[today] = { v: [], p: {}, c: {} };
+        const day = aData[today];
+
+        if (!day.v.includes(ipHash)) day.v.push(ipHash);
+        if (type === 'pageview') day.p[page] = (day.p[page] || 0) + 1;
+        if (type === 'click')    day.c[`${page}/${label}`] = (day.c[`${page}/${label}`] || 0) + 1;
+
+        // Keep only last 90 days
+        const dayKeys = Object.keys(aData).sort().slice(-90);
+        const trimmed = {};
+        dayKeys.forEach(k => { trimmed[k] = aData[k]; });
+
+        fs.writeFileSync(aFile, JSON.stringify(trimmed), 'utf8');
+      } catch (err) {
+        console.error('[analytics]', err.message);
+      }
+      res.writeHead(204); res.end();
+      return;
+    }
+
+    // ── POST /api/notify ──────────────────────────────────────────
+    if (pathname === '/api/notify' && req.method === 'POST') {
+      const session = getSession(req);
+      if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
+
+      if (!nodemailer || !process.env.SMTP_HOST) {
+        res.writeHead(501, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'SMTP non configuré' }));
+        return;
+      }
+
+      const { type, message } = JSON.parse(await readBody(req));
+      const subsFile = path.join(DATA, 'subscriptions.json');
+      let subs = [];
+      try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
+      if (!subs.length) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, sent: 0 }));
+        return;
+      }
+
+      const siteUrl  = process.env.RAILWAY_PUBLIC_DOMAIN
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : `http://localhost:${PORT}`;
+
+      const icons = { game_added:'🎲', event_added:'📅', event_deleted:'🗑️', table_added:'🪑', blog_added:'📝' };
+      const icon  = icons[type] || '🔔';
+
+      const transport = nodemailer.createTransport({
+        host:   process.env.SMTP_HOST,
+        port:   parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      });
+
+      let sent = 0;
+      for (const sub of subs) {
+        const unsubUrl = `${siteUrl}/unsubscribe?token=${encodeURIComponent(sub.token || sub.id)}`;
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <div style="background:#0e0c1a;padding:1.5rem 2rem;">
+    <p style="color:#e8a020;margin:0;font-size:1.3rem;font-weight:700;">&#9670; Ried &amp; R&ocirc;le</p>
+    <p style="color:#aaa;margin:.3rem 0 0;font-size:.82rem;">Notification du site</p>
+  </div>
+  <div style="padding:2rem;">
+    <p style="font-size:1.1rem;color:#1a1a2e;margin:0 0 1.5rem;">${icon} ${message}</p>
+    <a href="${siteUrl}" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.65rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.9rem;">Visiter le site</a>
+    <hr style="border:none;border-top:1px solid #eee;margin:2rem 0 1rem;">
+    <p style="font-size:.75rem;color:#999;margin:0;line-height:1.6;">
+      Vous recevez cet e-mail car vous êtes abonné aux notifications de
+      <a href="${siteUrl}" style="color:#e8a020;text-decoration:none;">Ried &amp; Rôle</a>.<br>
+      <a href="${unsubUrl}" style="color:#999;">Se désabonner</a>
+    </p>
+  </div>
+</div></body></html>`;
+
+        try {
+          await transport.sendMail({
+            from:    process.env.SMTP_FROM || `"Ried & Rôle" <${process.env.SMTP_USER}>`,
+            to:      sub.email,
+            subject: `[Ried & Rôle] ${message}`,
+            html
+          });
+          sent++;
+        } catch (err) {
+          console.error(`Email non envoyé à ${sub.email}:`, err.message);
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, sent }));
+      return;
+    }
+
+    // ── GET /unsubscribe?token=xxx ─────────────────────────────────
+    if (pathname === '/unsubscribe' && req.method === 'GET') {
+      const token    = u.searchParams.get('token');
+      const subsFile = path.join(DATA, 'subscriptions.json');
+      let subs = [], found = false;
+      try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
+
+      if (token) {
+        const before = subs.length;
+        subs  = subs.filter(s => (s.token || s.id) !== token);
+        found = subs.length < before;
+        if (found) fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
+      }
+
+      const msg   = found ? 'Vous avez bien été désabonné.' : 'Lien invalide ou déjà utilisé.';
+      const color = found ? '#4ade80' : '#fca5a5';
+      const html  = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Désabonnement — Ried &amp; Rôle</title></head>
+<body style="font-family:sans-serif;background:#0e0c1a;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
+<div style="background:#1a1530;border:1px solid #2a2545;border-radius:8px;padding:2.5rem 3rem;max-width:420px;text-align:center;">
+  <p style="color:#e8a020;font-size:1.4rem;font-weight:700;margin:0 0 1rem;">&#9670; Ried &amp; R&ocirc;le</p>
+  <p style="color:${color};font-size:1rem;margin:0 0 1.5rem;">${msg}</p>
+  <a href="/" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.6rem 1.3rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.88rem;">Retour au site</a>
+</div></body></html>`;
+
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
+
+    // ── POST /api/event-subscribe ─────────────────────────────────
+    if (pathname === '/api/event-subscribe' && req.method === 'POST') {
+      try {
+        const body    = JSON.parse(await readBody(req));
+        const email   = String(body.email   || '').trim().slice(0, 200);
+        const eventId = String(body.eventId || '').slice(0, 50);
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Adresse e-mail invalide.' }));
+          return;
+        }
+
+        let events = [];
+        try { events = JSON.parse(fs.readFileSync(path.join(DATA, 'events.json'), 'utf8')); } catch {}
+        const ev = events.find(e => e.id === eventId);
+        if (!ev) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Événement introuvable.' }));
+          return;
+        }
+
+        const eventMs = parseEventMs(ev);
+        if (!eventMs || eventMs < Date.now()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cet événement est déjà passé.' }));
+          return;
+        }
+
+        const subsFile = path.join(DATA, 'event_notif_subs.json');
+        let subs = [];
+        try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
+
+        if (!subs.find(s => s.email === email && s.eventId === eventId)) {
+          subs.push({
+            id:         'evtsub_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
+            token:      crypto.randomBytes(20).toString('hex'),
+            email, eventId,
+            eventTitle: ev.title,
+            eventMs,
+            sent1: false, sent2: false,
+            createdAt: new Date().toISOString()
+          });
+          fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"ok":true}');
+      } catch (err) {
+        console.error('[event-subscribe]', err.message);
+        if (!res.headersSent) { res.writeHead(500); res.end(); }
+      }
+      return;
+    }
+
+    // ── GET /event-notif-unsubscribe?token=xxx ─────────────────────
+    if (pathname === '/event-notif-unsubscribe' && req.method === 'GET') {
+      const token    = u.searchParams.get('token');
+      const subsFile = path.join(DATA, 'event_notif_subs.json');
+      let subs = [], found = false;
+      try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
+      if (token) {
+        const before = subs.length;
+        subs  = subs.filter(s => s.token !== token);
+        found = subs.length < before;
+        if (found) fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
+      }
+      const msg   = found ? 'Vous avez bien été désabonné des rappels pour cet événement.' : 'Lien invalide ou déjà utilisé.';
+      const color = found ? '#4ade80' : '#fca5a5';
+      const html  = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Désabonnement — Ried &amp; Rôle</title></head>
+<body style="font-family:sans-serif;background:#0e0c1a;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
+<div style="background:#1a1530;border:1px solid #2a2545;border-radius:8px;padding:2.5rem 3rem;max-width:420px;text-align:center;">
+  <p style="color:#e8a020;font-size:1.4rem;font-weight:700;margin:0 0 1rem;">&#9670; Ried &amp; R&ocirc;le</p>
+  <p style="color:${color};font-size:1rem;margin:0 0 1.5rem;">${msg}</p>
+  <a href="/" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.6rem 1.3rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.88rem;">Retour au site</a>
+</div></body></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
+
     // ── Data API : GET|POST /data/<name>.json ──────────────────────
     if (/^\/data\/[\w-]+\.json$/.test(pathname)) {
       const file = path.join(DATA, path.basename(pathname));
 
       if (req.method === 'GET') {
+        const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
         try {
           const data = await fs.promises.readFile(file, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.writeHead(200, headers);
           res.end(data);
         } catch {
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.writeHead(200, headers);
           res.end('[]');
         }
         return;
@@ -260,6 +505,100 @@ const server = http.createServer(async (req, res) => {
     }
   }
 });
+
+/* ── Event notification email ────────────────────────────────────── */
+async function sendEventNotifEmail(transport, sub, siteUrl, milestoneNum, hoursLeft) {
+  const unsubUrl = `${siteUrl}/event-notif-unsubscribe?token=${encodeURIComponent(sub.token)}`;
+  const timeStr  = fmtHours(hoursLeft);
+  const icon     = milestoneNum === 1 ? '📅' : '⏰';
+  const subject  = `[Ried & Rôle] Rappel ${milestoneNum}/2 : « ${sub.eventTitle} » dans ${timeStr}`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <div style="background:#0e0c1a;padding:1.5rem 2rem;">
+    <p style="color:#e8a020;margin:0;font-size:1.3rem;font-weight:700;">&#9670; Ried &amp; R&ocirc;le</p>
+    <p style="color:#aaa;margin:.3rem 0 0;font-size:.82rem;">Rappel événement — ${milestoneNum}/2</p>
+  </div>
+  <div style="padding:2rem;">
+    <p style="font-size:1.1rem;color:#1a1a2e;margin:0 0 .75rem;">${icon} <strong>${sub.eventTitle}</strong></p>
+    <p style="color:#555;margin:0 0 1.5rem;">L'événement aura lieu <strong>dans ${timeStr}</strong>. Ne l'oubliez pas !</p>
+    <a href="${siteUrl}/#evenements" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.65rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.9rem;">Voir les événements</a>
+    <hr style="border:none;border-top:1px solid #eee;margin:2rem 0 1rem;">
+    <p style="font-size:.75rem;color:#999;margin:0;line-height:1.6;">
+      Vous recevez cet e-mail car vous avez demandé à être notifié pour cet événement sur
+      <a href="${siteUrl}" style="color:#e8a020;text-decoration:none;">Ried &amp; Rôle</a>.<br>
+      <a href="${unsubUrl}" style="color:#999;">Se désabonner de ces rappels</a>
+    </p>
+  </div>
+</div></body></html>`;
+  try {
+    await transport.sendMail({
+      from:    process.env.SMTP_FROM || `"Ried & Rôle" <${process.env.SMTP_USER}>`,
+      to:      sub.email,
+      subject, html
+    });
+    console.log(`[event-notif] Jalon ${milestoneNum} → ${sub.email} pour "${sub.eventTitle}"`);
+  } catch (err) {
+    console.error(`[event-notif] Erreur email ${sub.email}:`, err.message);
+  }
+}
+
+/* ── Milestone scheduler (every 15 min) ──────────────────────────── */
+async function checkEventNotifMilestones() {
+  try {
+    if (!nodemailer || !process.env.SMTP_HOST) return;
+
+    const subsFile = path.join(DATA, 'event_notif_subs.json');
+    let subs = [];
+    try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch { return; }
+    if (!subs.length) return;
+
+    let cfg = {};
+    try { cfg = JSON.parse(fs.readFileSync(path.join(DATA, 'site.json'), 'utf8')); } catch {}
+    const m1h = Math.max(1, parseInt(cfg.milestone1Hours, 10) || 168);
+    const m2h = Math.max(1, parseInt(cfg.milestone2Hours, 10) || 24);
+
+    const transport = nodemailer.createTransport({
+      host:   process.env.SMTP_HOST,
+      port:   parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    });
+
+    const siteUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : `http://localhost:${PORT}`;
+
+    const now = Date.now();
+    let changed = false;
+
+    for (const sub of subs) {
+      if (!sub.eventMs) continue;
+      const msUntil = sub.eventMs - now;
+      if (msUntil <= 0) continue;
+
+      if (!sub.sent1 && msUntil <= m1h * 3600000) {
+        await sendEventNotifEmail(transport, sub, siteUrl, 1, Math.round(msUntil / 3600000));
+        sub.sent1 = true; changed = true;
+      }
+      if (!sub.sent2 && msUntil <= m2h * 3600000) {
+        await sendEventNotifEmail(transport, sub, siteUrl, 2, Math.round(msUntil / 3600000));
+        sub.sent2 = true; changed = true;
+      }
+    }
+
+    // Purge subscriptions for events more than 24h past
+    const active = subs.filter(s => !s.eventMs || s.eventMs > now - 86400000);
+    if (changed || active.length !== subs.length) {
+      fs.writeFileSync(subsFile, JSON.stringify(active), 'utf8');
+    }
+  } catch (err) {
+    console.error('[event-notif] scheduler:', err.message);
+  }
+}
+
+setInterval(checkEventNotifMilestones, 15 * 60 * 1000);
+setTimeout(checkEventNotifMilestones, 60000); // first check 1 min after startup
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`✓  Ried & Rôle  →  http://localhost:${PORT}`);

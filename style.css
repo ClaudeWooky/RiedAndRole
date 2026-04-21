@@ -1369,6 +1369,40 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   line-height: 1.6;
 }
 
+.footer-notif h5 {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+  padding-bottom: .6rem;
+  border-bottom: 1px solid var(--border);
+}
+.footer-notif-desc {
+  font-size: .83rem;
+  color: var(--text-muted);
+  margin-bottom: .9rem;
+  line-height: 1.5;
+}
+.notif-input {
+  width: 100%;
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .55rem .8rem;
+  border-radius: 3px;
+  font-size: .88rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.notif-input:focus { border-color: var(--accent); }
+.notif-msg {
+  font-size: .78rem;
+  margin-top: .5rem;
+}
+
 .footer-bottom {
   border-top: 1px solid var(--border);
   padding: 1.2rem 0;
@@ -1457,4 +1491,42 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   .event-item { grid-template-columns: 65px 20px 1fr; gap: 0 1rem; }
   .header-main { height: 60px; }
   :root { --header-h: 60px; }
+}
+
+/* ── Bouton Être notifié & groupe de boutons événements ───────────── */
+.event-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  margin-top: .2rem;
+}
+
+.btn-event-notif {
+  background: transparent;
+  color: #a78bfa;
+  border: 2px solid rgba(124,58,237,.4);
+  transition: all .2s;
+}
+.btn-event-notif:hover {
+  background: rgba(124,58,237,.15);
+  border-color: #a78bfa;
+  color: #c4b5fd;
+  transform: translateY(-1px);
+}
+
+/* ── Modal Être notifié ───────────────────────────────────────────── */
+.modal-desc {
+  font-size: .88rem;
+  color: var(--text-muted);
+  margin-bottom: 1.2rem;
+  line-height: 1.55;
+}
+
+.notif-popup-msg {
+  font-size: .88rem;
+  margin-top: .5rem;
+  padding: .5rem .75rem;
+  border-radius: 3px;
+  background: rgba(255,255,255,.05);
 }

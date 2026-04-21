@@ -482,6 +482,18 @@
                 <input type="number" id="site-annees" min="0" placeholder="6" />
               </div>
             </div>
+            <div class="site-settings-grid" style="margin-top:1.25rem;margin-bottom:0;">
+              <div class="form-group">
+                <label for="site-milestone1">Jalon 1 — 1<sup>er</sup> rappel (heures avant)</label>
+                <input type="number" id="site-milestone1" min="1" placeholder="168" />
+                <small class="form-hint">Ex : 168 = 7 jours avant l'événement</small>
+              </div>
+              <div class="form-group">
+                <label for="site-milestone2">Jalon 2 — 2<sup>e</sup> rappel (heures avant)</label>
+                <input type="number" id="site-milestone2" min="1" placeholder="24" />
+                <small class="form-hint">Ex : 24 = veille de l'événement · Jalon 1 &gt; Jalon 2</small>
+              </div>
+            </div>
             <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
           </form>
         </div>
@@ -568,6 +580,51 @@
           </div>
 
         </div>
+
+        <!-- ── Abonnés aux notifications ── -->
+        <div class="section-title-bar section-title-bar--sub">
+          <h2>&#128276; Abonnés aux Notifications</h2>
+          <p>Visiteurs inscrits pour recevoir les actualités du site.</p>
+        </div>
+        <div class="admin-list-panel" style="margin-bottom:2rem;">
+          <div class="panel-header">
+            <h3>Abonnés</h3>
+            <span class="item-count" id="count-subscribers">0</span>
+          </div>
+          <div id="list-subscribers" class="admin-list">
+            <p class="empty-msg">Aucun abonné.</p>
+          </div>
+        </div>
+
+        <!-- ── Journal des notifications ── -->
+        <div class="section-title-bar section-title-bar--sub">
+          <h2>&#128203; Journal des Notifications</h2>
+          <p>Historique des 100 dernières actions notifiables.</p>
+        </div>
+        <div class="admin-list-panel" style="margin-bottom:2rem;">
+          <div class="panel-header" style="justify-content:space-between;">
+            <h3>Journal</h3>
+            <button type="button" id="btn-clear-notif-log" class="btn-outline-sm">Tout effacer</button>
+          </div>
+          <div id="list-notif-log" class="admin-list notif-log-list">
+            <p class="empty-msg">Aucune notification enregistrée.</p>
+          </div>
+        </div>
+
+        <!-- ── Analytics ── -->
+        <div class="section-title-bar section-title-bar--sub">
+          <h2>&#128200; Analytics</h2>
+          <p>Fréquentation du site (30 derniers jours). Une adresse IP = un visiteur unique par jour.</p>
+        </div>
+        <div class="analytics-panel-wrap">
+          <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:.75rem;">
+            <button type="button" id="btn-refresh-analytics" class="btn-outline-sm">&#x27F3; Rafraîchir</button>
+          </div>
+          <div id="analytics-panel">
+            <p class="empty-msg">Aucune donnée disponible.</p>
+          </div>
+        </div>
+
       </section>
 
     </main>

@@ -14,9 +14,9 @@ function escHtml(str) {
 const FR_MONTHS = { Jan:0, 'Fév':1, Mar:2, Avr:3, Mai:4, Jun:5, Jul:6, 'Aoû':7, Sep:8, Oct:9, Nov:10, 'Déc':11 };
 
 /* ─── In-memory data store (populated by loadAllData) ────────────── */
-const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [] };
+const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [] };
 
-const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog' };
+const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions' };
 
 const BLOG_CATS = {
   'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' },
@@ -60,6 +60,7 @@ async function loadAllData() {
   loadDynamicBlog();
   loadHomeBlog();
   await applyStatConfig();
+  initNotifWidget();
 })();
 
 function loadHomeGames() {
@@ -119,6 +120,12 @@ function eventEffectiveEndDate(e) {
   return eventToDate(e);
 }
 
+function isEventPast(e) {
+  const d = eventEffectiveEndDate(e);
+  if (!d) return false;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() < Date.now();
+}
+
 /* ─── Events ─────────────────────────────────────────────────────── */
 function loadDynamicEvents() {
   const events = _data.events;
@@ -146,6 +153,7 @@ function loadDynamicEvents() {
   if (featured) {
     const el = document.getElementById('dynamic-featured-event');
     if (el) el.innerHTML = buildFeaturedEventHTML(featured);
+    _updateNextEventBar(featured);
   }
 
   const container = document.getElementById('dynamic-events');
@@ -228,6 +236,36 @@ function buildEventTablesHTML(eventId) {
   </div>`;
 }
 
+function _updateNextEventBar(e) {
+  const bar = document.querySelector('.next-event-bar');
+  if (!bar) return;
+
+  const FR_DAYS   = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const FR_MONTHS_LONG = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const FR_M = { Jan:0,'Fév':1,Mar:2,Avr:3,Mai:4,Jun:5,Jul:6,'Aoû':7,Sep:8,Oct:9,Nov:10,'Déc':11 };
+
+  const d = e.startDay || e.day || '';
+  const m = e.startMonth || e.month || '';
+  const y = e.startYear  || e.year  || '';
+  let dateStr = `${d} ${m} ${y}`.trim();
+
+  const mIdx = FR_M[m];
+  if (d && mIdx !== undefined && y) {
+    const dt  = new Date(parseInt(y), mIdx, parseInt(d));
+    dateStr   = `${FR_DAYS[dt.getDay()]} ${parseInt(d)} ${FR_MONTHS_LONG[mIdx]} ${y}`;
+  }
+
+  const dateEl  = bar.querySelector('.next-event-date');
+  const titleEl = bar.querySelector('.next-event-title');
+  const linkEl  = bar.querySelector('a.nav-link');
+
+  if (dateEl)  dateEl.textContent  = dateStr;
+  if (titleEl) titleEl.textContent = e.title || '';
+  if (linkEl && e.id) {
+    linkEl.dataset.scrollTo = 'dynamic-featured-event';
+  }
+}
+
 function buildFeaturedEventHTML(e) {
   const times    = eventTimeDisplay(e);
   const dateRange = buildDateRangeDisplay(e, times);
@@ -249,7 +287,10 @@ function buildFeaturedEventHTML(e) {
         ${e.inscription ? `<li data-spots="${escHtml(e.id)}">&#9998;${spotsLabel(e)}</li>` : ''}
       </ul>
       ${buildEventTablesHTML(e.id)}
-      ${e.inscription ? `<button class="btn btn-primary btn-inscrire"${isEventFull(e) ? ' disabled' : ''} data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+      ${!isEventPast(e) ? `<div class="event-btn-row">
+        ${e.inscription ? `<button class="btn btn-primary btn-inscrire"${isEventFull(e) ? ' disabled' : ''} data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+        <button class="btn btn-outline btn-event-notif" data-notif-id="${escHtml(e.id)}" data-notif-title="${escHtml(e.title)}">&#128276; Être notifié</button>
+      </div>` : ''}
     </div>
   </div>`;
 }
@@ -278,7 +319,10 @@ function buildTimelineEventHTML(e) {
         ${e.inscription ? `<span data-spots="${escHtml(e.id)}">&#9998;${spotsLabel(e)}</span>` : ''}
       </div>
       ${buildEventTablesHTML(e.id)}
-      ${e.inscription ? `<button class="btn btn-primary btn-sm btn-inscrire" style="margin-top:.8rem;"${isEventFull(e) ? ' disabled' : ''} data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+      ${!isEventPast(e) ? `<div class="event-btn-row" style="margin-top:.8rem;">
+        ${e.inscription ? `<button class="btn btn-primary btn-sm btn-inscrire"${isEventFull(e) ? ' disabled' : ''} data-event-id="${escHtml(e.id)}" data-event-title="${escHtml(e.title)}">S'inscrire</button>` : ''}
+        <button class="btn btn-sm btn-event-notif" data-notif-id="${escHtml(e.id)}" data-notif-title="${escHtml(e.title)}">&#128276; Être notifié</button>
+      </div>` : ''}
     </div>
   </div>`;
 }
@@ -444,6 +488,21 @@ const navLinks = document.querySelectorAll('.nav-link');
 const navMenu  = document.getElementById('main-nav');
 const navToggle= document.getElementById('nav-toggle');
 
+function _sendBeacon(type, page, label) {
+  const payload = JSON.stringify({ type, page, label: label || '' });
+  // sendBeacon can return false if the UA can't queue the request; always fall back to fetch
+  const queued = typeof navigator.sendBeacon === 'function' &&
+    navigator.sendBeacon('/api/analytics', new Blob([payload], { type: 'application/json' }));
+  if (!queued) {
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true
+    }).catch(() => {});
+  }
+}
+
 function showPage(target, scrollToId) {
   pages.forEach(p => p.classList.toggle('active', p.id === target));
 
@@ -451,6 +510,7 @@ function showPage(target, scrollToId) {
     l.classList.toggle('active', l.dataset.target === target);
   });
 
+  _sendBeacon('pageview', target);
   try { history.pushState(null, '', '#' + target); } catch {}
 
   if (scrollToId) {
@@ -485,6 +545,15 @@ window.addEventListener('popstate', () => {
   const hash = location.hash.replace('#', '') || 'home';
   showPage(hash);
 });
+
+/* ─── Click analytics ─────────────────────────────────────────────── */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button, a, .btn, [data-event-id]');
+  if (!btn) return;
+  const currentPage = document.querySelector('.page.active')?.id || 'home';
+  const label = (btn.textContent || btn.getAttribute('aria-label') || btn.className || '').trim().slice(0, 60);
+  if (label) _sendBeacon('click', currentPage, label);
+}, { passive: true });
 
 (function init() {
   try {
@@ -732,4 +801,127 @@ document.head.appendChild(animStyle);
     document.body.appendChild(ok);
     setTimeout(() => ok.remove(), 3500);
   });
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   WIDGET NOTIFICATIONS
+══════════════════════════════════════════════════════════════════ */
+function initNotifWidget() {
+  const emailInput = document.getElementById('notif-email-input');
+  const subBtn     = document.getElementById('btn-subscribe');
+  const msgEl      = document.getElementById('notif-msg');
+  if (!emailInput || !subBtn) return;
+
+  subBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      _notifMsg('Adresse e-mail invalide.', false); return;
+    }
+    const subs = _data.subscriptions || [];
+    if (subs.find(s => s.email === email)) {
+      _notifMsg('Cette adresse est déjà abonnée.', false); return;
+    }
+    const _uid  = 'sub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const _tok  = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : (_uid + '_' + Math.random().toString(36).slice(2, 10));
+    const entry = { id: _uid, token: _tok, email, createdAt: new Date().toISOString() };
+    subs.push(entry);
+    _data.subscriptions = subs;
+    try {
+      await fetch('/data/subscriptions.json', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(subs)
+      });
+    } catch {
+      try { localStorage.setItem('rr_subscriptions', JSON.stringify(subs)); } catch {}
+    }
+    emailInput.value = '';
+    _notifMsg('Abonnement confirmé ! Vous recevrez un e-mail pour vous désabonner.', true);
+  });
+
+  function _notifMsg(text, ok) {
+    msgEl.textContent = text;
+    msgEl.style.color   = ok ? '#4ade80' : '#fca5a5';
+    msgEl.style.display = '';
+    setTimeout(() => { msgEl.style.display = 'none'; }, 5000);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODAL ÊTRE NOTIFIÉ (rappels événement)
+══════════════════════════════════════════════════════════════════ */
+(function initEventNotifModal() {
+  const overlay    = document.getElementById('event-notif-overlay');
+  const titleEl    = document.getElementById('event-notif-event-title');
+  const emailInput = document.getElementById('event-notif-email');
+  const submitBtn  = document.getElementById('event-notif-submit');
+  const cancelBtn  = document.getElementById('event-notif-cancel');
+  const msgEl      = document.getElementById('event-notif-msg');
+  if (!overlay) return;
+
+  let currentEventId = null;
+
+  function openModal(eventId, eventTitle) {
+    currentEventId = eventId;
+    titleEl.textContent = eventTitle || '';
+    emailInput.value = '';
+    msgEl.hidden = true;
+    submitBtn.disabled = false;
+    submitBtn.textContent = '🔔 Me notifier';
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => emailInput.focus(), 50);
+  }
+
+  function closeModal() {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    currentEventId = null;
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-event-notif');
+    if (btn) openModal(btn.dataset.notifId, btn.dataset.notifTitle);
+  });
+
+  cancelBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  submitBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      _showMsg('Adresse e-mail invalide.', false); return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = '…';
+    try {
+      const res  = await fetch('/api/event-subscribe', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, eventId: currentEventId })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        _showMsg('Inscription confirmée ! Vous recevrez des rappels par e-mail.', true);
+        emailInput.value = '';
+        setTimeout(closeModal, 3000);
+      } else {
+        _showMsg(data.error || 'Erreur. Veuillez réessayer.', false);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '🔔 Me notifier';
+      }
+    } catch {
+      _showMsg('Erreur réseau. Veuillez réessayer.', false);
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🔔 Me notifier';
+    }
+  });
+
+  function _showMsg(text, ok) {
+    msgEl.textContent = text;
+    msgEl.style.color = ok ? '#4ade80' : '#fca5a5';
+    msgEl.hidden = false;
+  }
 })();

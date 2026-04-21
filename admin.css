@@ -211,6 +211,34 @@ ul { list-style: none; }
 .btn-photo-clear:hover { background: rgba(239,68,68,.3); }
 #member-photo-preview { display: flex; align-items: center; gap: 1rem; }
 
+/* ── Notification log ── */
+.notif-log-list { display: flex; flex-direction: column; gap: 0; }
+.notif-log-item {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  padding: .55rem .75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .82rem;
+}
+.notif-log-item:last-child { border-bottom: none; }
+.notif-log-icon { flex-shrink: 0; font-size: 1rem; }
+.notif-log-msg  { flex: 1; color: var(--text); }
+.notif-log-date { flex-shrink: 0; color: var(--text-muted); font-size: .75rem; white-space: nowrap; }
+.sub-event-badge {
+  display: inline-block;
+  background: #2a1f4a;
+  color: #e8a020;
+  border: 1px solid #e8a02066;
+  border-radius: 4px;
+  font-size: .7rem;
+  padding: 1px 7px;
+  margin-left: .5rem;
+  vertical-align: middle;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
 .game-preview-img {
   width: 160px;
   height: 70px;
@@ -900,4 +928,132 @@ ul { list-style: none; }
   .section-title-bar { padding: 1rem; }
   .site-settings-grid { grid-template-columns: 1fr; }
   .perms-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ─── Analytics ─────────────────────────────────────────────────── */
+.analytics-panel-wrap {
+  padding: 1.5rem;
+  max-width: 900px;
+  margin-bottom: 2rem;
+}
+
+.analytics-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: .75rem 1rem;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.analytics-summary-item {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: .9rem;
+  color: var(--text-muted);
+}
+.analytics-summary-item strong { color: var(--accent); }
+
+.analytics-table {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.analytics-day-row {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.analytics-day-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .65rem 1rem;
+  cursor: pointer;
+  transition: background .15s;
+  flex-wrap: wrap;
+}
+.analytics-day-header:hover { background: rgba(232,160,32,.06); }
+
+.analytics-date {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: .9rem;
+  color: var(--accent);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.analytics-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .05rem;
+  min-width: 70px;
+}
+.analytics-stat strong { font-size: 1rem; color: var(--text-light); }
+.analytics-stat-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.analytics-top { min-width: 120px; align-items: flex-start; }
+.analytics-top strong { font-size: .82rem; color: var(--text); }
+
+.analytics-toggle-icon {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: .85rem;
+  flex-shrink: 0;
+}
+
+.analytics-day-detail {
+  padding: .75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,.2);
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+.analytics-day-detail[hidden] { display: none; }
+
+.analytics-detail-section {
+  font-size: .82rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+}
+.analytics-detail-section strong { color: var(--text); margin-right: .25rem; }
+
+.analytics-page-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: rgba(99,102,241,.15);
+  border: 1px solid rgba(99,102,241,.25);
+  color: #a5b4fc;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: .1rem .4rem;
+  border-radius: 2px;
+}
+.analytics-page-chip strong { color: var(--text-light); }
+
+.analytics-click-chip {
+  background: rgba(34,197,94,.12);
+  border-color: rgba(34,197,94,.25);
+  color: #86efac;
 }
