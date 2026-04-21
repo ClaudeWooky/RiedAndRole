@@ -1,5 +1,6 @@
 'use strict';
 const http       = require('http');
+const https      = require('https');
 const fs         = require('fs');
 const path       = require('path');
 const crypto     = require('crypto');
@@ -36,6 +37,61 @@ function smtpSecure() { return (process.env.SMTP_SECURE || String(_cfg.smtpSecur
 function smtpUser()   { return process.env.SMTP_USER   || _cfg.smtpUser   || ''; }
 function smtpPass()   { return process.env.SMTP_PASS   || _cfg.smtpPass   || ''; }
 function smtpFrom()   { return process.env.SMTP_FROM   || _cfg.smtpFrom   || `"Ried & Rôle" <${smtpUser()}>`; }
+function sgKey()      { return process.env.SENDGRID_API_KEY || _cfg.sendgridApiKey || ''; }
+
+function isEmailConfigured() { return !!(sgKey() || (nodemailer && smtpHost())); }
+
+function _parsedFrom() {
+  const raw = smtpFrom();
+  const m   = raw.match(/^"?([^"<]*)"?\s*<([^>]+)>$/);
+  return m ? { name: m[1].trim(), email: m[2].trim() } : { email: raw.trim() };
+}
+
+async function sendEmail({ to, subject, html, replyTo }) {
+  if (sgKey()) {
+    const from = _parsedFrom();
+    const body = JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from,
+      subject,
+      content: [{ type: 'text/html', value: html }],
+      ...(replyTo ? { reply_to: { email: replyTo } } : {})
+    });
+    return new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'api.sendgrid.com',
+        path:     '/v3/mail/send',
+        method:   'POST',
+        headers:  {
+          'Authorization':  `Bearer ${sgKey()}`,
+          'Content-Type':   'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      }, res => {
+        let d = '';
+        res.on('data', c => d += c);
+        res.on('end', () => {
+          if (res.statusCode >= 400) {
+            reject(new Error(`SendGrid ${res.statusCode}: ${d}`));
+          } else resolve();
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+  }
+
+  if (nodemailer && smtpHost()) {
+    const t = nodemailer.createTransport({
+      host: smtpHost(), port: smtpPort(), secure: smtpSecure(),
+      auth: { user: smtpUser(), pass: smtpPass() }
+    });
+    return t.sendMail({ from: smtpFrom(), to, subject, html, ...(replyTo ? { replyTo } : {}) });
+  }
+
+  throw new Error('Aucun service email configuré');
+}
 
 /* ── Sessions (in-memory, lost on server restart) ────────────────── */
 const _sessions = new Map();
@@ -285,9 +341,9 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
 
-      if (!nodemailer || !smtpHost()) {
+      if (!isEmailConfigured()) {
         res.writeHead(501, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'SMTP non configuré' }));
+        res.end(JSON.stringify({ ok: false, error: 'Service email non configuré' }));
         return;
       }
 
@@ -325,13 +381,6 @@ const server = http.createServer(async (req, res) => {
           }</ul>`
         : '';
 
-      const transport = nodemailer.createTransport({
-        host:   smtpHost(),
-        port:   smtpPort(),
-        secure: smtpSecure(),
-        auth:   { user: smtpUser(), pass: smtpPass() }
-      });
-
       let sent = 0;
       for (const sub of subs) {
         const unsubUrl = `${siteUrl}/unsubscribe?token=${encodeURIComponent(sub.token || sub.id)}`;
@@ -355,12 +404,7 @@ const server = http.createServer(async (req, res) => {
 </div></body></html>`;
 
         try {
-          await transport.sendMail({
-            from:    smtpFrom(),
-            to:      sub.email,
-            subject: `[Ried & Rôle] ${message}`,
-            html
-          });
+          await sendEmail({ to: sub.email, subject: `[Ried & Rôle] ${message}`, html });
           sent++;
         } catch (err) {
           console.error(`Email non envoyé à ${sub.email}:`, err.message);
@@ -498,17 +542,9 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const CONTACT_TO = 'ried.and.role@gmail.com';
-
-        if (nodemailer && smtpHost()) {
-          const transport = nodemailer.createTransport({
-            host:   smtpHost(),
-            port:   smtpPort(),
-            secure: smtpSecure(),
-            auth:   { user: smtpUser(), pass: smtpPass() }
-          });
-          const subjectLine = subject ? `[Contact] ${subject}` : '[Contact] Nouveau message depuis le site';
-          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+        const CONTACT_TO    = 'ried.and.role@gmail.com';
+        const subjectLine   = subject ? `[Contact] ${subject}` : '[Contact] Nouveau message depuis le site';
+        const contactHtml   = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
 <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
   <div style="background:#0e0c1a;padding:1.5rem 2rem;">
@@ -524,13 +560,9 @@ const server = http.createServer(async (req, res) => {
     <div style="background:#f8f8f8;border-left:3px solid #e8a020;padding:1rem 1.2rem;border-radius:0 4px 4px 0;white-space:pre-wrap;color:#333;">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
   </div>
 </div></body></html>`;
-          await transport.sendMail({
-            from:     smtpFrom(),
-            to:       CONTACT_TO,
-            replyTo:  email,
-            subject:  subjectLine,
-            html
-          });
+
+        if (isEmailConfigured()) {
+          await sendEmail({ to: CONTACT_TO, subject: subjectLine, html: contactHtml, replyTo: email });
         } else {
           console.log(`[contact] Message de ${fname} ${lname} <${email}> : ${message.slice(0, 80)}`);
         }
@@ -600,7 +632,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 /* ── Event notification email ────────────────────────────────────── */
-async function sendEventNotifEmail(transport, sub, siteUrl, milestoneNum, hoursLeft) {
+async function sendEventNotifEmail(sub, siteUrl, milestoneNum, hoursLeft) {
   const unsubUrl = `${siteUrl}/event-notif-unsubscribe?token=${encodeURIComponent(sub.token)}`;
   const timeStr  = fmtHours(hoursLeft);
   const icon     = milestoneNum === 1 ? '📅' : '⏰';
@@ -625,11 +657,7 @@ async function sendEventNotifEmail(transport, sub, siteUrl, milestoneNum, hoursL
   </div>
 </div></body></html>`;
   try {
-    await transport.sendMail({
-      from:    smtpFrom(),
-      to:      sub.email,
-      subject, html
-    });
+    await sendEmail({ to: sub.email, subject, html });
     console.log(`[event-notif] Jalon ${milestoneNum} → ${sub.email} pour "${sub.eventTitle}"`);
   } catch (err) {
     console.error(`[event-notif] Erreur email ${sub.email}:`, err.message);
@@ -639,7 +667,7 @@ async function sendEventNotifEmail(transport, sub, siteUrl, milestoneNum, hoursL
 /* ── Milestone scheduler (every 15 min) ──────────────────────────── */
 async function checkEventNotifMilestones() {
   try {
-    if (!nodemailer || !smtpHost()) return;
+    if (!isEmailConfigured()) return;
 
     const subsFile = path.join(DATA, 'event_notif_subs.json');
     let subs = [];
@@ -650,13 +678,6 @@ async function checkEventNotifMilestones() {
     try { cfg = JSON.parse(fs.readFileSync(path.join(DATA, 'site.json'), 'utf8')); } catch {}
     const m1h = Math.max(1, parseInt(cfg.milestone1Hours, 10) || 168);
     const m2h = Math.max(1, parseInt(cfg.milestone2Hours, 10) || 24);
-
-    const transport = nodemailer.createTransport({
-      host:   smtpHost(),
-      port:   smtpPort(),
-      secure: smtpSecure(),
-      auth:   { user: smtpUser(), pass: smtpPass() }
-    });
 
     const siteUrl = process.env.RAILWAY_PUBLIC_DOMAIN
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -671,11 +692,11 @@ async function checkEventNotifMilestones() {
       if (msUntil <= 0) continue;
 
       if (!sub.sent1 && msUntil <= m1h * 3600000) {
-        await sendEventNotifEmail(transport, sub, siteUrl, 1, Math.round(msUntil / 3600000));
+        await sendEventNotifEmail(sub, siteUrl, 1, Math.round(msUntil / 3600000));
         sub.sent1 = true; changed = true;
       }
       if (!sub.sent2 && msUntil <= m2h * 3600000) {
-        await sendEventNotifEmail(transport, sub, siteUrl, 2, Math.round(msUntil / 3600000));
+        await sendEventNotifEmail(sub, siteUrl, 2, Math.round(msUntil / 3600000));
         sub.sent2 = true; changed = true;
       }
     }
