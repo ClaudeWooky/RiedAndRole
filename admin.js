@@ -1291,7 +1291,7 @@ function renderNotifications() {
     const regularHTML = subs.map(s => `
       <div class="admin-item">
         <div class="admin-item-info">
-          <div class="admin-item-title">&#128231; ${esc(s.email)}</div>
+          <div class="admin-item-title">&#128231; ${esc(s.email)}${s.notifCount ? ` <span class="sub-notif-count">${s.notifCount} mail${s.notifCount > 1 ? 's' : ''} envoyé${s.notifCount > 1 ? 's' : ''}</span>` : ''}</div>
           <div class="admin-item-meta">${new Date(s.createdAt).toLocaleString('fr-FR')}</div>
         </div>
         <div class="admin-item-actions">

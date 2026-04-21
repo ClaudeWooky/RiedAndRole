@@ -381,7 +381,7 @@ const server = http.createServer(async (req, res) => {
           }</ul>`
         : '';
 
-      let sent = 0;
+      let sent = 0, subsChanged = false;
       for (const sub of subs) {
         const unsubUrl = `${siteUrl}/unsubscribe?token=${encodeURIComponent(sub.token || sub.id)}`;
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
@@ -406,10 +406,13 @@ const server = http.createServer(async (req, res) => {
         try {
           await sendEmail({ to: sub.email, subject: `[Ried & Rôle] ${message}`, html });
           sent++;
+          sub.notifCount = (sub.notifCount || 0) + 1;
+          subsChanged = true;
         } catch (err) {
           console.error(`Email non envoyé à ${sub.email}:`, err.message);
         }
       }
+      if (subsChanged) fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, sent }));

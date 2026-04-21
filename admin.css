@@ -238,6 +238,18 @@ ul { list-style: none; }
   font-weight: 600;
   letter-spacing: .02em;
 }
+.sub-notif-count {
+  display: inline-block;
+  background: #1a2e1a;
+  color: #4ade80;
+  border: 1px solid #4ade8044;
+  border-radius: 4px;
+  font-size: .7rem;
+  padding: 1px 7px;
+  margin-left: .5rem;
+  vertical-align: middle;
+  font-weight: 600;
+}
 
 .game-preview-img {
   width: 160px;
