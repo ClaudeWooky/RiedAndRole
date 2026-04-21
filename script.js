@@ -647,19 +647,32 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 const form    = document.getElementById('contact-form');
 const success = document.getElementById('form-success');
 
-if (form) form.addEventListener('submit', e => {
+if (form) form.addEventListener('submit', async e => {
   e.preventDefault();
   const btn = form.querySelector('button[type="submit"]');
   btn.textContent = 'Envoi en cours…';
   btn.disabled = true;
 
-  setTimeout(() => {
-    if (success) success.classList.add('visible');
-    form.reset();
-    btn.textContent = 'Envoyer le message ›';
-    btn.disabled = false;
-    if (success) setTimeout(() => success.classList.remove('visible'), 5000);
-  }, 1200);
+  try {
+    const data = {
+      fname:   form.fname.value.trim(),
+      lname:   form.lname.value.trim(),
+      email:   form.email.value.trim(),
+      subject: form.subject?.value || '',
+      message: form.message.value.trim(),
+    };
+    await fetch('/api/contact', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    });
+  } catch {}
+
+  if (success) success.classList.add('visible');
+  form.reset();
+  btn.textContent = 'Envoyer le message ›';
+  btn.disabled = false;
+  if (success) setTimeout(() => success.classList.remove('visible'), 5000);
 });
 
 /* ─── Particle generator ─────────────────────────────────────────── */

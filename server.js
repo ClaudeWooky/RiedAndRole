@@ -454,6 +454,68 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── POST /api/contact ─────────────────────────────────────────
+    if (pathname === '/api/contact' && req.method === 'POST') {
+      try {
+        const body    = JSON.parse(await readBody(req));
+        const fname   = String(body.fname   || '').trim().slice(0, 100);
+        const lname   = String(body.lname   || '').trim().slice(0, 100);
+        const email   = String(body.email   || '').trim().slice(0, 200);
+        const subject = String(body.subject || '').trim().slice(0, 200);
+        const message = String(body.message || '').trim().slice(0, 5000);
+
+        if (!fname || !email || !message || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Champs requis manquants.' }));
+          return;
+        }
+
+        const CONTACT_TO = 'ried.and.role@gmail.com';
+
+        if (nodemailer && process.env.SMTP_HOST) {
+          const transport = nodemailer.createTransport({
+            host:   process.env.SMTP_HOST,
+            port:   parseInt(process.env.SMTP_PORT || '587', 10),
+            secure: process.env.SMTP_SECURE === 'true',
+            auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+          });
+          const subjectLine = subject ? `[Contact] ${subject}` : '[Contact] Nouveau message depuis le site';
+          const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <div style="background:#0e0c1a;padding:1.5rem 2rem;">
+    <p style="color:#e8a020;margin:0;font-size:1.3rem;font-weight:700;">&#9670; Ried &amp; R&ocirc;le</p>
+    <p style="color:#aaa;margin:.3rem 0 0;font-size:.82rem;">Message depuis le formulaire de contact</p>
+  </div>
+  <div style="padding:2rem;">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem;">
+      <tr><td style="color:#888;padding:.3rem 0;width:90px;">De</td><td style="color:#1a1a2e;font-weight:600;">${fname} ${lname}</td></tr>
+      <tr><td style="color:#888;padding:.3rem 0;">Email</td><td><a href="mailto:${email}" style="color:#e8a020;">${email}</a></td></tr>
+      ${subject ? `<tr><td style="color:#888;padding:.3rem 0;">Sujet</td><td style="color:#1a1a2e;">${subject}</td></tr>` : ''}
+    </table>
+    <div style="background:#f8f8f8;border-left:3px solid #e8a020;padding:1rem 1.2rem;border-radius:0 4px 4px 0;white-space:pre-wrap;color:#333;">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+  </div>
+</div></body></html>`;
+          await transport.sendMail({
+            from:     process.env.SMTP_FROM || `"Ried & Rôle" <${process.env.SMTP_USER}>`,
+            to:       CONTACT_TO,
+            replyTo:  email,
+            subject:  subjectLine,
+            html
+          });
+        } else {
+          console.log(`[contact] Message de ${fname} ${lname} <${email}> : ${message.slice(0, 80)}`);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"ok":true}');
+      } catch (err) {
+        console.error('[contact]', err.message);
+        if (!res.headersSent) { res.writeHead(500); res.end('{"ok":false}'); }
+      }
+      return;
+    }
+
     // ── Data API : GET|POST /data/<name>.json ──────────────────────
     if (/^\/data\/[\w-]+\.json$/.test(pathname)) {
       const file = path.join(DATA, path.basename(pathname));
