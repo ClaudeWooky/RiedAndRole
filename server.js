@@ -13,10 +13,12 @@ const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.jo
 /* ── Ensure data directory exists ────────────────────────────────── */
 fs.mkdirSync(DATA, { recursive: true });
 
-/* ── Super-admin : config.json → variables d'environnement ──────── */
+/* ── config.json → super-admin + SMTP ───────────────────────────── */
 let _super = { adminUser: '', adminPass: '' };
+let _cfg   = {};
 try {
-  _super = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
+  _cfg   = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
+  _super = _cfg;
   console.log('✓  config.json chargé');
 } catch {
   if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
@@ -26,6 +28,14 @@ try {
     console.warn('⚠  Aucun credential configuré — super-admin désactivé');
   }
 }
+
+/* Les env vars restent prioritaires sur config.json */
+function smtpHost()   { return process.env.SMTP_HOST   || _cfg.smtpHost   || ''; }
+function smtpPort()   { return parseInt(process.env.SMTP_PORT   || _cfg.smtpPort   || '587', 10); }
+function smtpSecure() { return (process.env.SMTP_SECURE || String(_cfg.smtpSecure || 'false')) === 'true'; }
+function smtpUser()   { return process.env.SMTP_USER   || _cfg.smtpUser   || ''; }
+function smtpPass()   { return process.env.SMTP_PASS   || _cfg.smtpPass   || ''; }
+function smtpFrom()   { return process.env.SMTP_FROM   || _cfg.smtpFrom   || `"Ried & Rôle" <${smtpUser()}>`; }
 
 /* ── Sessions (in-memory, lost on server restart) ────────────────── */
 const _sessions = new Map();
@@ -275,13 +285,13 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
 
-      if (!nodemailer || !process.env.SMTP_HOST) {
+      if (!nodemailer || !smtpHost()) {
         res.writeHead(501, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'SMTP non configuré' }));
         return;
       }
 
-      const { type, message } = JSON.parse(await readBody(req));
+      const { type, message, details, anchor } = JSON.parse(await readBody(req));
       const subsFile = path.join(DATA, 'subscriptions.json');
       let subs = [];
       try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
@@ -295,14 +305,31 @@ const server = http.createServer(async (req, res) => {
         ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
         : `http://localhost:${PORT}`;
 
-      const icons = { game_added:'🎲', event_added:'📅', event_deleted:'🗑️', table_added:'🪑', blog_added:'📝' };
-      const icon  = icons[type] || '🔔';
+      const icons = {
+        game_added:'🎲', game_modified:'🎲',
+        event_added:'📅', event_modified:'📅', event_deleted:'🗑️',
+        table_added:'🪑',
+        blog_added:'📝', blog_modified:'📝',
+      };
+      const icon = icons[type] || '🔔';
+
+      const pageUrl  = `${siteUrl}${anchor || ''}`;
+      const btnLabel = anchor === '#evenements' ? 'Voir les événements'
+                     : anchor === '#jeux'       ? 'Voir les jeux'
+                     : anchor === '#blog'       ? 'Voir le blog'
+                     : 'Visiter le site';
+
+      const detailsHtml = Array.isArray(details) && details.length
+        ? `<ul style="margin:0 0 1.5rem;padding-left:1.2rem;color:#444;font-size:.92rem;line-height:1.8;">${
+            details.map(d => `<li>${d.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</li>`).join('')
+          }</ul>`
+        : '';
 
       const transport = nodemailer.createTransport({
-        host:   process.env.SMTP_HOST,
-        port:   parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        host:   smtpHost(),
+        port:   smtpPort(),
+        secure: smtpSecure(),
+        auth:   { user: smtpUser(), pass: smtpPass() }
       });
 
       let sent = 0;
@@ -315,8 +342,9 @@ const server = http.createServer(async (req, res) => {
     <p style="color:#aaa;margin:.3rem 0 0;font-size:.82rem;">Notification du site</p>
   </div>
   <div style="padding:2rem;">
-    <p style="font-size:1.1rem;color:#1a1a2e;margin:0 0 1.5rem;">${icon} ${message}</p>
-    <a href="${siteUrl}" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.65rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.9rem;">Visiter le site</a>
+    <p style="font-size:1.1rem;color:#1a1a2e;margin:0 0 ${detailsHtml ? '1rem' : '1.5rem'};">${icon} ${message}</p>
+    ${detailsHtml}
+    <a href="${pageUrl}" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.65rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.9rem;">${btnLabel}</a>
     <hr style="border:none;border-top:1px solid #eee;margin:2rem 0 1rem;">
     <p style="font-size:.75rem;color:#999;margin:0;line-height:1.6;">
       Vous recevez cet e-mail car vous êtes abonné aux notifications de
@@ -328,7 +356,7 @@ const server = http.createServer(async (req, res) => {
 
         try {
           await transport.sendMail({
-            from:    process.env.SMTP_FROM || `"Ried & Rôle" <${process.env.SMTP_USER}>`,
+            from:    smtpFrom(),
             to:      sub.email,
             subject: `[Ried & Rôle] ${message}`,
             html
@@ -472,12 +500,12 @@ const server = http.createServer(async (req, res) => {
 
         const CONTACT_TO = 'ried.and.role@gmail.com';
 
-        if (nodemailer && process.env.SMTP_HOST) {
+        if (nodemailer && smtpHost()) {
           const transport = nodemailer.createTransport({
-            host:   process.env.SMTP_HOST,
-            port:   parseInt(process.env.SMTP_PORT || '587', 10),
-            secure: process.env.SMTP_SECURE === 'true',
-            auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+            host:   smtpHost(),
+            port:   smtpPort(),
+            secure: smtpSecure(),
+            auth:   { user: smtpUser(), pass: smtpPass() }
           });
           const subjectLine = subject ? `[Contact] ${subject}` : '[Contact] Nouveau message depuis le site';
           const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
@@ -497,7 +525,7 @@ const server = http.createServer(async (req, res) => {
   </div>
 </div></body></html>`;
           await transport.sendMail({
-            from:     process.env.SMTP_FROM || `"Ried & Rôle" <${process.env.SMTP_USER}>`,
+            from:     smtpFrom(),
             to:       CONTACT_TO,
             replyTo:  email,
             subject:  subjectLine,
@@ -553,8 +581,11 @@ const server = http.createServer(async (req, res) => {
       const stat = await fs.promises.stat(filePath);
       if (stat.isDirectory()) filePath = path.join(filePath, 'index.html');
       const data = await fs.promises.readFile(filePath);
-      const mime = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
-      res.writeHead(200, { 'Content-Type': mime });
+      const ext  = path.extname(filePath).toLowerCase();
+      const mime = MIME[ext] || 'application/octet-stream';
+      const hdrs = { 'Content-Type': mime };
+      if (ext === '.js' || ext === '.css' || ext === '.html') hdrs['Cache-Control'] = 'no-cache';
+      res.writeHead(200, hdrs);
       res.end(data);
     } catch {
       res.writeHead(404); res.end('Not found');
@@ -595,7 +626,7 @@ async function sendEventNotifEmail(transport, sub, siteUrl, milestoneNum, hoursL
 </div></body></html>`;
   try {
     await transport.sendMail({
-      from:    process.env.SMTP_FROM || `"Ried & Rôle" <${process.env.SMTP_USER}>`,
+      from:    smtpFrom(),
       to:      sub.email,
       subject, html
     });
@@ -608,7 +639,7 @@ async function sendEventNotifEmail(transport, sub, siteUrl, milestoneNum, hoursL
 /* ── Milestone scheduler (every 15 min) ──────────────────────────── */
 async function checkEventNotifMilestones() {
   try {
-    if (!nodemailer || !process.env.SMTP_HOST) return;
+    if (!nodemailer || !smtpHost()) return;
 
     const subsFile = path.join(DATA, 'event_notif_subs.json');
     let subs = [];
@@ -621,10 +652,10 @@ async function checkEventNotifMilestones() {
     const m2h = Math.max(1, parseInt(cfg.milestone2Hours, 10) || 24);
 
     const transport = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST,
-      port:   parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      host:   smtpHost(),
+      port:   smtpPort(),
+      secure: smtpSecure(),
+      auth:   { user: smtpUser(), pass: smtpPass() }
     });
 
     const siteUrl = process.env.RAILWAY_PUBLIC_DOMAIN

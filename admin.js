@@ -20,6 +20,10 @@ let currentPhotoData     = null;
 let currentGameImageData = null;
 let gameImageCleared     = false;
 
+let _eventSnap = null;
+let _gameSnap  = null;
+let _blogSnap  = null;
+
 /* ─── STORAGE KEYS (= file base names in data/) ──────────────────── */
 const KEYS = {
   events:    'events',
@@ -242,6 +246,7 @@ function bindForms() {
     };
 
     if (editingEventId) {
+      const snap = _eventSnap || {};
       const items = getData(KEYS.events).map(ev =>
         ev.id === editingEventId ? { ...ev, ...fields } : ev
       );
@@ -249,9 +254,11 @@ function bindForms() {
       cancelEventEdit();
       renderEvents();
       showToast('Événement modifié !');
+      const changes = diffEvent(snap, fields);
+      if (changes.length) logNotification('event_modified', `L'événement « ${fields.title} » a été modifié`, changes, '#evenements');
     } else {
       prepend(KEYS.events, { id: genId('evt'), ...fields });
-      logNotification('event_added', `Nouvel événement : ${fields.title}`);
+      logNotification('event_added', `Nouvel événement : « ${fields.title} »`, [], '#evenements');
       e.target.reset();
       renderEvents();
       showToast('Événement ajouté !');
@@ -302,11 +309,11 @@ function bindForms() {
     };
 
     if (editingGameId) {
+      const snap = _gameSnap || {};
       if (currentGameImageData !== null) {
         item.image = currentGameImageData;
       } else if (!gameImageCleared) {
-        const existing = getData(KEYS.games).find(g => g.id === editingGameId);
-        item.image = existing ? (existing.image || null) : null;
+        item.image = snap.image || null;
       }
       const items = getData(KEYS.games).map(g =>
         g.id === editingGameId ? { ...g, ...item, id: editingGameId } : g
@@ -315,9 +322,11 @@ function bindForms() {
       cancelGameEdit();
       renderGames();
       showToast('Jeu modifié !');
+      const changes = diffGame(snap, item);
+      if (changes.length) logNotification('game_modified', `Le jeu « ${item.title} » a été modifié`, changes, '#jeux');
     } else {
       prepend(KEYS.games, item);
-      logNotification('game_added', `Nouveau jeu de rôle : ${item.title}`);
+      logNotification('game_added', `Nouveau jeu de rôle : « ${item.title} »`, [], '#jeux');
       e.target.reset();
       _clearGameImage();
       renderGames();
@@ -477,15 +486,18 @@ function bindBlogForm() {
       createdAt: new Date().toISOString()
     };
     if (editingBlogId) {
+      const snap = _blogSnap || {};
       item.id = editingBlogId;
       _cache[KEYS.blog] = getData(KEYS.blog).map(b => b.id === editingBlogId ? item : b);
       saveData(KEYS.blog, _cache[KEYS.blog]);
       cancelBlogEdit();
       renderBlog();
       showToast('Article modifié !');
+      const changes = diffBlog(snap, item);
+      if (changes.length) logNotification('blog_modified', `L'article « ${item.title} » a été modifié`, changes, '#blog');
     } else {
       prepend(KEYS.blog, { id: genId('blog'), ...item });
-      logNotification('blog_added', `Nouvel article : ${item.title}`);
+      logNotification('blog_added', `Nouvel article : « ${item.title} »`, [], '#blog');
       e.target.reset();
       renderBlog();
       showToast('Article ajouté !');
@@ -589,7 +601,7 @@ function renderEvents() {
 
   bindDeleteButtons(list, KEYS.events, renderEvents, id => {
     const ev = getData(KEYS.events).find(e => e.id === id);
-    if (ev) logNotification('event_deleted', `Événement supprimé : ${ev.title}`);
+    if (ev) logNotification('event_deleted', `L'événement « ${ev.title} » a été supprimé`, [], '#evenements');
   });
   list.querySelectorAll('.btn-registrations').forEach(btn => {
     btn.addEventListener('click', () => openRegistrationsModal(btn.dataset.regEvent, btn.dataset.regTitle));
@@ -821,7 +833,7 @@ function bindTableModal() {
     } else {
       prepend(KEYS.tables, { id: genId('tbl'), eventId: _tableModalEventId, ...fields });
       const _ev = getData(KEYS.events).find(e => e.id === _tableModalEventId);
-      logNotification('table_added', `Nouvelle table ajoutée${_ev ? ` à "${_ev.title}"` : ''} : ${fields.gameName}`);
+      logNotification('table_added', `Nouvelle table « ${fields.gameName} »${_ev ? ` à l'événement « ${_ev.title} »` : ''}`, [], '#evenements');
       refreshTableSection(_tableModalEventId);
       overlay.hidden = true;
       showToast('Table ajoutée !');
@@ -834,6 +846,7 @@ function bindTableModal() {
 
 function populateEventForm(item) {
   editingEventId = item.id;
+  _eventSnap = JSON.parse(JSON.stringify(item));
   const form = document.getElementById('form-events');
   const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val || ''; };
   const chk  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.checked = !!val; };
@@ -875,6 +888,7 @@ function populateEventForm(item) {
 
 function cancelEventEdit() {
   editingEventId = null;
+  _eventSnap = null;
   const form = document.getElementById('form-events');
   form.reset();
   form.querySelector('button[type="submit"]').textContent = 'Ajouter l\'événement';
@@ -924,6 +938,7 @@ function renderGames() {
 
 function populateGameForm(item) {
   editingGameId = item.id;
+  _gameSnap = JSON.parse(JSON.stringify(item));
   const form = document.getElementById('form-games');
   const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val || ''; };
   const chk  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.checked = !!val; };
@@ -965,6 +980,7 @@ function populateGameForm(item) {
 
 function cancelGameEdit() {
   editingGameId = null;
+  _gameSnap = null;
   const form = document.getElementById('form-games');
   form.reset();
   _clearGameImage();
@@ -1124,6 +1140,7 @@ function renderBlog() {
 
 function populateBlogForm(item) {
   editingBlogId = item.id;
+  _blogSnap = JSON.parse(JSON.stringify(item));
   const form = document.getElementById('form-blog');
   const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val || ''; };
   set('title',    item.title);
@@ -1147,6 +1164,7 @@ function populateBlogForm(item) {
 
 function cancelBlogEdit() {
   editingBlogId = null;
+  _blogSnap = null;
   const form = document.getElementById('form-blog');
   form.reset();
   form.querySelector('button[type="submit"]').textContent = "Ajouter l'article";
@@ -1531,7 +1549,55 @@ function bindAccountForm() {
 }
 
 /* ─── Notification log ───────────────────────────────────────────── */
-function logNotification(type, message) {
+/* ─── Diff helpers ───────────────────────────────────────────────── */
+function _norm(v, max = 80) {
+  const s = String(v ?? '').trim();
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+function diffEvent(snap, neo) {
+  const ch = [];
+  const n  = (v) => _norm(v);
+
+  const oldStart = [snap.startDay, snap.startMonth, snap.startYear].map(n).filter(Boolean).join(' ');
+  const newStart = [neo.startDay,  neo.startMonth,  neo.startYear ].map(n).filter(Boolean).join(' ');
+  if (oldStart !== newStart) ch.push(`Date de début : ${oldStart||'—'} → ${newStart||'—'}`);
+
+  if (n(snap.startTimeFrom) !== n(neo.startTimeFrom)) ch.push(`Heure de début : ${n(snap.startTimeFrom)||'—'} → ${n(neo.startTimeFrom)||'—'}`);
+  if (n(snap.startTimeTo)   !== n(neo.startTimeTo))   ch.push(`Heure de fin : ${n(snap.startTimeTo)||'—'} → ${n(neo.startTimeTo)||'—'}`);
+
+  const oldEnd = [snap.endDay, snap.endMonth, snap.endYear].map(n).filter(Boolean).join(' ');
+  const newEnd = [neo.endDay,  neo.endMonth,  neo.endYear ].map(n).filter(Boolean).join(' ');
+  if (oldEnd !== newEnd) ch.push(`Date de fin : ${oldEnd||'—'} → ${newEnd||'—'}`);
+
+  for (const [k, label] of [['title','Titre'],['description','Description'],['location','Lieu'],['capacity','Capacité'],['tag','Type']]) {
+    if (n(snap[k]) !== n(neo[k])) ch.push(`${label} : ${n(snap[k])||'—'} → ${n(neo[k])||'—'}`);
+  }
+  if (!!snap.inscription !== !!neo.inscription) ch.push(`Inscription : ${snap.inscription ? 'oui' : 'non'} → ${neo.inscription ? 'oui' : 'non'}`);
+  if (!!snap.featured    !== !!neo.featured)    ch.push(`Mis en avant : ${snap.featured ? 'oui' : 'non'} → ${neo.featured ? 'oui' : 'non'}`);
+  return ch;
+}
+
+function diffGame(snap, neo) {
+  const ch = [];
+  const n  = (v) => _norm(v);
+  for (const [k, label] of [['title','Titre'],['tag','Catégorie'],['description','Description']]) {
+    if (n(snap[k]) !== n(neo[k])) ch.push(`${label} : ${n(snap[k])||'—'} → ${n(neo[k])||'—'}`);
+  }
+  if (!!snap.popular !== !!neo.popular) ch.push(`Populaire : ${snap.popular ? 'oui' : 'non'} → ${neo.popular ? 'oui' : 'non'}`);
+  return ch;
+}
+
+function diffBlog(snap, neo) {
+  const ch = [];
+  const n  = (v) => _norm(v);
+  for (const [k, label] of [['title','Titre'],['catLabel','Catégorie'],['author','Auteur'],['date','Date'],['excerpt','Extrait']]) {
+    if (n(snap[k]) !== n(neo[k])) ch.push(`${label} : ${n(snap[k])||'—'} → ${n(neo[k])||'—'}`);
+  }
+  return ch;
+}
+
+function logNotification(type, message, details = [], anchor = '') {
   const entry = { id: genId('notif'), type, message, createdAt: new Date().toISOString() };
   const items = getData(KEYS.notif).slice();
   items.unshift(entry);
@@ -1541,7 +1607,7 @@ function logNotification(type, message) {
   fetch('/api/notify', {
     method:  'POST',
     headers: getAuthHeaders(),
-    body:    JSON.stringify({ type, message })
+    body:    JSON.stringify({ type, message, details, anchor })
   }).then(r => r.json()).then(d => {
     if (d.ok && d.sent > 0) showToast(`📧 ${d.sent} notification(s) envoyée(s).`);
   }).catch(() => {});

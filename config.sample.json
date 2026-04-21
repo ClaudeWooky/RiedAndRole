@@ -1,4 +1,11 @@
 {
-  "adminUser": "votre-email@exemple.com",
-  "adminPass": "VotreMotDePasseSecurise123!"
+  "adminUser": "votre-login-admin",
+  "adminPass": "VotreMotDePasseSecurise123!",
+
+  "smtpHost":   "smtp.gmail.com",
+  "smtpPort":   587,
+  "smtpSecure": false,
+  "smtpUser":   "ried.and.role@gmail.com",
+  "smtpPass":   "xxxx xxxx xxxx xxxx",
+  "smtpFrom":   "\"Ried & Rôle\" <ried.and.role@gmail.com>"
 }
