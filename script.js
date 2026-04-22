@@ -61,6 +61,7 @@ async function loadAllData() {
   loadHomeBlog();
   await applyStatConfig();
   initNotifWidget();
+  _initBlogArticleModal();
 })();
 
 function loadHomeGames() {
@@ -328,6 +329,38 @@ function buildTimelineEventHTML(e) {
 }
 
 /* ─── Blog ───────────────────────────────────────────────────────── */
+function _blogExcerpt(content, max = 200) {
+  if (!content) return '';
+  const text = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
+}
+
+function _openBlogArticle(id) {
+  const a = (_data.blog || []).find(b => b.id === id);
+  if (!a) return;
+  const cat = BLOG_CATS[a.category] || { label: a.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+  document.getElementById('bam-header').style.background = a.gradient || cat.gradient;
+  document.getElementById('bam-icon').textContent  = a.icon || cat.icon;
+  document.getElementById('bam-tag').textContent   = a.catLabel || cat.label;
+  document.getElementById('bam-tag').className     = `tag tag-${escHtml(a.tagColor || cat.color)}`;
+  document.getElementById('bam-title').textContent = a.title;
+  document.getElementById('bam-meta').textContent  = `Par ${a.author}  ·  ${formatBlogDate(a.date)}`;
+  document.getElementById('bam-content').innerHTML = a.content || '<p><em>Contenu non disponible.</em></p>';
+  document.getElementById('blog-article-overlay').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function _initBlogArticleModal() {
+  const overlay = document.getElementById('blog-article-overlay');
+  if (!overlay) return;
+  document.getElementById('bam-close').addEventListener('click', () => {
+    overlay.hidden = true; document.body.style.overflow = '';
+  });
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { overlay.hidden = true; document.body.style.overflow = ''; }
+  });
+}
+
 function loadDynamicBlog() {
   const container = document.getElementById('dynamic-blog');
   if (!container) return;
@@ -341,7 +374,7 @@ function loadDynamicBlog() {
     const cat = BLOG_CATS[a.category] || { label: a.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
     const dateStr = formatBlogDate(a.date);
     return `
-    <article class="blog-article">
+    <article class="blog-article blog-article-clickable" data-blog-id="${escHtml(a.id)}">
       <div class="ba-img" style="background:${escHtml(a.gradient || cat.gradient)};">
         <div class="ba-icon">${escHtml(a.icon || cat.icon)}</div>
         <div class="ba-date">${escHtml(dateStr)}</div>
@@ -350,10 +383,14 @@ function loadDynamicBlog() {
         <div class="ba-cats"><span class="tag tag-${escHtml(a.tagColor || cat.color)}">${escHtml(a.catLabel || cat.label)}</span></div>
         <h2>${escHtml(a.title)}</h2>
         <div class="ba-meta">Par <strong>${escHtml(a.author)}</strong> | ${escHtml(dateStr)}</div>
-        <p>${escHtml(a.excerpt)}</p>
+        <p>${escHtml(_blogExcerpt(a.content))}</p>
+        <span class="ba-read-more">Lire la suite →</span>
       </div>
     </article>`;
   }).join('');
+  container.querySelectorAll('.blog-article-clickable').forEach(el => {
+    el.addEventListener('click', () => _openBlogArticle(el.dataset.blogId));
+  });
   loadBlogSidebar();
 }
 
@@ -397,7 +434,7 @@ function loadHomeBlog() {
       <div class="blog-card-body">
         <span class="tag tag-${escHtml(a.tagColor || cat.color)}">${escHtml(a.catLabel || cat.label)}</span>
         <h3><a href="#blog" class="nav-link" data-target="blog">${escHtml(a.title)}</a></h3>
-        <p>${escHtml(a.excerpt)}</p>
+        <p>${escHtml(_blogExcerpt(a.content, 120))}</p>
         <div class="blog-meta"><span>Par ${escHtml(a.author)}</span><span>${escHtml(formatBlogDate(a.date))}</span></div>
       </div>
     </article>`;
@@ -929,6 +966,88 @@ function initNotifWidget() {
       _showMsg('Erreur réseau. Veuillez réessayer.', false);
       submitBtn.disabled = false;
       submitBtn.textContent = '🔔 Me notifier';
+    }
+  });
+
+  function _showMsg(text, ok) {
+    msgEl.textContent = text;
+    msgEl.style.color = ok ? '#4ade80' : '#fca5a5';
+    msgEl.hidden = false;
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   MODAL PRÉFÉRENCES NOTIFICATIONS
+══════════════════════════════════════════════════════════════════ */
+(function initNotifPrefModal() {
+  const overlay    = document.getElementById('notif-pref-overlay');
+  const emailInput = document.getElementById('notif-pref-email');
+  const submitBtn  = document.getElementById('notif-pref-submit');
+  const cancelBtn  = document.getElementById('notif-pref-cancel');
+  const msgEl      = document.getElementById('notif-pref-msg');
+  const heroBtn    = document.getElementById('btn-notif-hero');
+  if (!overlay || !heroBtn) return;
+
+  const toutCb     = document.getElementById('notif-topic-tout');
+  const specificCbs = [...document.querySelectorAll('[name="notif-topic"]')].filter(cb => cb.value !== 'tout');
+
+  toutCb.addEventListener('change', () => {
+    if (toutCb.checked) specificCbs.forEach(cb => cb.checked = false);
+  });
+  specificCbs.forEach(cb => cb.addEventListener('change', () => {
+    if (cb.checked) toutCb.checked = false;
+  }));
+
+  function openModal() {
+    toutCb.checked = true;
+    specificCbs.forEach(cb => cb.checked = false);
+    emailInput.value = '';
+    msgEl.hidden = true;
+    submitBtn.disabled = false;
+    submitBtn.textContent = "S'abonner";
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  heroBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  submitBtn.addEventListener('click', async () => {
+    const email  = emailInput.value.trim();
+    const topics = [...document.querySelectorAll('[name="notif-topic"]:checked')].map(cb => cb.value);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      _showMsg('Adresse e-mail invalide.', false); return;
+    }
+    if (!topics.length) {
+      _showMsg('Choisissez au moins un sujet.', false); return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = '…';
+    try {
+      const res  = await fetch('/api/subscribe', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, topics })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        _showMsg('Abonnement confirmé ! Un e-mail de confirmation vous a été envoyé.', true);
+        setTimeout(closeModal, 3000);
+      } else {
+        _showMsg(data.error || 'Erreur. Veuillez réessayer.', false);
+        submitBtn.disabled = false;
+        submitBtn.textContent = "S'abonner";
+      }
+    } catch {
+      _showMsg('Erreur réseau. Veuillez réessayer.', false);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "S'abonner";
     }
   });
 

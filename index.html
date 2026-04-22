@@ -68,6 +68,7 @@
           <div class="hero-buttons">
             <a href="#jeux" class="btn btn-primary nav-link" data-target="jeux">Découvrir nos jeux</a>
             <a href="#contacts" class="btn btn-outline nav-link" data-target="contacts">Nous rejoindre</a>
+            <button type="button" id="btn-notif-hero" class="btn btn-ghost-notif">&#128276; Être notifié</button>
           </div>
         </div>
         <div class="hero-scroll">
@@ -634,13 +635,6 @@
             <p>&#128205; Sous la salle polyvalente<br>Rue de Baldenheim<br>67390 Hessenheim</p>
             <p>&#128231; ried.and.role@gmail.com</p>
           </div>
-          <div class="footer-notif">
-            <h5>Notifications</h5>
-            <p class="footer-notif-desc">Nouveau jeu, événement ou article — restez informé !</p>
-            <input type="email" id="notif-email-input" placeholder="votre@email.fr" class="notif-input" />
-            <button type="button" id="btn-subscribe" class="btn btn-primary btn-sm" style="margin-top:.6rem;width:100%;">S'abonner</button>
-            <p class="notif-msg" id="notif-msg" style="display:none;"></p>
-          </div>
         </div>
       </div>
     </div>
@@ -685,7 +679,7 @@
     </div>
   </div>
 
-  <!-- ══════════════  MODAL ÊTRE NOTIFIÉ  ══════════════ -->
+  <!-- ══════════════  MODAL ÊTRE NOTIFIÉ (événement)  ══════════════ -->
   <div id="event-notif-overlay" class="modal-overlay" hidden>
     <div class="modal-card">
       <h3 class="modal-title">&#128276; Être notifié</h3>
@@ -699,6 +693,45 @@
       <div class="modal-actions" style="margin-top:1.5rem;">
         <button type="button" id="event-notif-cancel" class="btn btn-outline">Annuler</button>
         <button type="button" id="event-notif-submit" class="btn btn-primary">&#128276; Me notifier</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL PRÉFÉRENCES NOTIFICATIONS  ══════════════ -->
+  <div id="notif-pref-overlay" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-title">&#128276; Être notifié</h3>
+      <p class="modal-desc">Choisissez les sujets pour lesquels vous souhaitez recevoir des notifications par e-mail.</p>
+      <div class="notif-topics">
+        <label class="notif-topic-label notif-topic-all"><input type="checkbox" name="notif-topic" value="tout" id="notif-topic-tout" checked> Tout</label>
+        <label class="notif-topic-label"><input type="checkbox" name="notif-topic" value="games"> Jeux de rôles</label>
+        <label class="notif-topic-label"><input type="checkbox" name="notif-topic" value="events"> Événements</label>
+        <label class="notif-topic-label"><input type="checkbox" name="notif-topic" value="blog"> Articles de blog</label>
+      </div>
+      <div class="form-group" style="margin-top:1.2rem;">
+        <label for="notif-pref-email">Adresse e-mail</label>
+        <input type="email" id="notif-pref-email" placeholder="votre@email.fr" />
+      </div>
+      <p id="notif-pref-msg" class="notif-popup-msg" hidden></p>
+      <div class="modal-actions">
+        <button type="button" id="notif-pref-cancel" class="btn btn-outline">Annuler</button>
+        <button type="button" id="notif-pref-submit" class="btn btn-primary">S'abonner</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL ARTICLE BLOG  ══════════════ -->
+  <div id="blog-article-overlay" class="modal-overlay" hidden>
+    <div class="blog-article-modal">
+      <div class="bam-header" id="bam-header">
+        <div class="bam-header-icon" id="bam-icon"></div>
+        <button type="button" id="bam-close" class="bam-close">&#x2715;</button>
+      </div>
+      <div class="bam-body">
+        <span class="tag" id="bam-tag"></span>
+        <h2 class="bam-title" id="bam-title"></h2>
+        <div class="bam-meta" id="bam-meta"></div>
+        <div class="bam-content ql-editor" id="bam-content"></div>
       </div>
     </div>
   </div>

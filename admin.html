@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Rajdhani:wght@400;500;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="admin.css" />
+  <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css" />
 </head>
 <body>
 
@@ -439,15 +440,7 @@
                 <label>Auteur *</label>
                 <input type="text" name="author" placeholder="Prénom Nom" required />
               </div>
-              <div class="form-group">
-                <label>Date *</label>
-                <input type="date" name="date" required />
-              </div>
-              <div class="form-group">
-                <label>Extrait *</label>
-                <textarea name="excerpt" rows="5" placeholder="Résumé de l'article (affiché sur le site)..." required></textarea>
-              </div>
-              <button type="submit" class="btn btn-primary btn-full">Ajouter l'article</button>
+              <button type="submit" class="btn btn-primary btn-full">&#9998; Créer l'article</button>
             </form>
           </div>
 
@@ -706,6 +699,36 @@
     </div>
   </div>
 
+  <!-- ══════════════  MODAL CONFIRMATION  ══════════════ -->
+  <div id="confirm-overlay" class="modal-overlay" hidden>
+    <div class="modal-card" style="max-width:380px;text-align:center;">
+      <p id="confirm-msg" style="margin-bottom:1.5rem;font-size:1rem;line-height:1.6;color:var(--text-light);"></p>
+      <div class="modal-actions" style="justify-content:center;gap:1rem;">
+        <button type="button" id="confirm-no"  class="btn-confirm-no">Non</button>
+        <button type="button" id="confirm-yes" class="btn-confirm-yes">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL ÉDITEUR ARTICLE BLOG  ══════════════ -->
+  <div id="blog-editor-overlay" class="modal-overlay" hidden>
+    <div class="blog-editor-card">
+      <div class="blog-editor-header">
+        <div class="blog-editor-header-info">
+          <div class="blog-editor-article-title" id="blog-editor-article-title"></div>
+          <div class="blog-editor-meta" id="blog-editor-meta"></div>
+        </div>
+        <button type="button" id="blog-editor-close" class="blog-editor-close-btn" title="Fermer">&#x2715;</button>
+      </div>
+      <div id="blog-quill-editor"></div>
+      <div class="blog-editor-footer">
+        <button type="button" id="blog-editor-cancel" class="btn-outline-sm">Annuler</button>
+        <button type="button" id="blog-editor-publish" class="btn btn-primary">&#128228; Publier</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

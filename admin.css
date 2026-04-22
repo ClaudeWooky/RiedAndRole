@@ -138,9 +138,39 @@ ul { list-style: none; }
 .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem; }
 .modal-overlay[hidden] { display:none; }
 .modal-card { background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:2rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto; }
+
+/* ─── Blog editor modal ──────────────────────────────────────────── */
+.blog-editor-card { display:flex;flex-direction:column;width:96vw;max-width:940px;height:88vh;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.5); }
+.blog-editor-header { display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1.4rem;background:#0e0c1a;border-bottom:2px solid #e8a020;flex-shrink:0; }
+.blog-editor-header-info { min-width:0; }
+.blog-editor-article-title { font-family:'Cinzel',serif;color:#e8a020;font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.blog-editor-meta { font-size:.78rem;color:#aaa;margin-top:.15rem; }
+.blog-editor-close-btn { background:transparent;border:1px solid #444;color:#aaa;width:2rem;height:2rem;border-radius:50%;cursor:pointer;font-size:.9rem;flex-shrink:0;transition:all .2s; }
+.blog-editor-close-btn:hover { border-color:#e8a020;color:#e8a020; }
+#blog-quill-editor { flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0; }
+#blog-quill-editor .ql-toolbar { flex-shrink:0;border-left:none;border-right:none;border-top:none;border-bottom:1px solid #ddd;background:#f8f8f8;padding:.4rem .6rem; }
+#blog-quill-editor .ql-container { flex:1;overflow-y:auto;border:none;font-size:1rem;font-family:'Open Sans',sans-serif;line-height:1.8; }
+#blog-quill-editor .ql-editor { min-height:100%;padding:1.5rem 2rem; }
+#blog-quill-editor .ql-editor.ql-blank::before { color:#bbb;font-style:italic; }
+.blog-editor-footer { display:flex;align-items:center;justify-content:flex-end;gap:.8rem;padding:.8rem 1.4rem;background:#f4f4f4;border-top:1px solid #ddd;flex-shrink:0; }
+
+/* ─── Quill image resize bar ─────────────────────────────────────── */
+#ql-img-resize-bar { position:absolute;z-index:9999;display:flex;align-items:center;gap:.3rem;background:#1a1530;border:1px solid #e8a020;border-radius:6px;padding:.35rem .6rem;box-shadow:0 4px 16px rgba(0,0,0,.5);white-space:nowrap; }
+#ql-img-resize-bar .ql-resize-label { font-size:.75rem;color:#aaa;margin-right:.2rem; }
+#ql-img-resize-bar .ql-resize-sep { width:1px;height:1.2rem;background:#444;margin:0 .2rem; }
+#ql-img-resize-bar button { background:rgba(255,255,255,.08);border:1px solid #444;color:#d4dbe8;border-radius:3px;padding:.2rem .5rem;font-size:.78rem;cursor:pointer;transition:all .15s;font-family:'Rajdhani',sans-serif;font-weight:600; }
+#ql-img-resize-bar button:hover { background:rgba(232,160,32,.2);border-color:#e8a020;color:#e8a020; }
+#ql-img-resize-bar button.active { background:rgba(232,160,32,.25);border-color:#e8a020;color:#e8a020; }
+.ql-img-selected { outline:2px solid #e8a020;outline-offset:2px; }
 .modal-card-wide { max-width:680px; }
 .modal-title { font-family:'Cinzel',serif;color:var(--accent);font-size:1.1rem;margin-bottom:1rem; }
 .modal-actions { display:flex;gap:.8rem;justify-content:flex-end; }
+
+.btn-confirm-no,.btn-confirm-yes { padding:.65rem 2rem;font-family:'Rajdhani',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;border-radius:3px;transition:all .2s; }
+.btn-confirm-no  { background:transparent;border:1px solid var(--border);color:var(--text-muted); }
+.btn-confirm-no:hover  { border-color:var(--text-muted);color:var(--text); }
+.btn-confirm-yes { background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);color:#fca5a5; }
+.btn-confirm-yes:hover { background:rgba(239,68,68,.4);border-color:var(--red); }
 
 .reg-list { display:flex;flex-direction:column;gap:.8rem; }
 .reg-item { display:flex;gap:1rem;align-items:flex-start;padding:.8rem;background:var(--bg-card2);border:1px solid var(--border);border-radius:4px; }
@@ -234,6 +264,19 @@ ul { list-style: none; }
   font-size: .7rem;
   padding: 1px 7px;
   margin-left: .5rem;
+  vertical-align: middle;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.sub-topic-badge {
+  display: inline-block;
+  background: rgba(99,102,241,.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 4px;
+  font-size: .7rem;
+  padding: 1px 7px;
+  margin-right: .3rem;
   vertical-align: middle;
   font-weight: 600;
   letter-spacing: .02em;

@@ -495,42 +495,202 @@ function bindGameImageInput() {
   });
 }
 
+/* ─── Blog editor (Quill) ─────────────────────────────────────────── */
+let _quill          = null;
+let _pendingBlogData = null;
+
+function _initQuill() {
+  if (_quill) return;
+  _quill = new Quill('#blog-quill-editor', {
+    theme: 'snow',
+    placeholder: 'Écrivez votre article ici…',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        [{ align: [] }],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ indent: '-1' }, { indent: '+1' }],
+        ['blockquote'],
+        ['link', 'image'],
+        ['clean']
+      ]
+    }
+  });
+  _initQuillImageResize(_quill);
+}
+
+function _initQuillImageResize(quill) {
+  let _selectedImg = null;
+
+  quill.root.addEventListener('click', e => {
+    if (e.target.tagName === 'IMG') {
+      _selectedImg = e.target;
+      _selectedImg.classList.add('ql-img-selected');
+      _showImgResizeBar(_selectedImg);
+    } else if (!e.target.closest('#ql-img-resize-bar')) {
+      _hideImgResizeBar();
+    }
+  });
+
+  function _showImgResizeBar(img) {
+    _hideImgResizeBar();
+    const bar = document.createElement('div');
+    bar.id = 'ql-img-resize-bar';
+    bar.innerHTML = `
+      <span class="ql-resize-label">Largeur :</span>
+      <button data-w="25">25%</button>
+      <button data-w="33">33%</button>
+      <button data-w="50">50%</button>
+      <button data-w="75">75%</button>
+      <button data-w="100">100%</button>
+      <span class="ql-resize-sep"></span>
+      <button data-align="left" title="Aligner à gauche">◀</button>
+      <button data-align="center" title="Centrer">▬</button>
+      <button data-align="right" title="Aligner à droite">▶</button>
+      <span class="ql-resize-sep"></span>
+      <button data-close title="Fermer">✕</button>`;
+    document.body.appendChild(bar);
+    _positionBar(bar, img);
+
+    bar.querySelectorAll('[data-w]').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        img.style.width  = btn.dataset.w + '%';
+        img.style.height = 'auto';
+        _setActive(bar, btn);
+      });
+    });
+    bar.querySelectorAll('[data-align]').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const a = btn.dataset.align;
+        img.style.display    = 'block';
+        img.style.marginLeft  = a === 'right' ? 'auto' : (a === 'center' ? 'auto' : '0');
+        img.style.marginRight = a === 'left'  ? 'auto' : (a === 'center' ? 'auto' : '0');
+        _setActive(bar, btn);
+      });
+    });
+    bar.querySelector('[data-close]').addEventListener('mousedown', e => {
+      e.preventDefault();
+      _hideImgResizeBar();
+    });
+  }
+
+  function _positionBar(bar, img) {
+    const r  = img.getBoundingClientRect();
+    const bw = bar.offsetWidth || 420;
+    let left = r.left + window.scrollX + r.width / 2 - bw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+    const top = r.top + window.scrollY - 44;
+    bar.style.left = left + 'px';
+    bar.style.top  = (top < 8 ? r.bottom + window.scrollY + 6 : top) + 'px';
+  }
+
+  function _hideImgResizeBar() {
+    document.getElementById('ql-img-resize-bar')?.remove();
+    if (_selectedImg) { _selectedImg.classList.remove('ql-img-selected'); _selectedImg = null; }
+  }
+
+  function _setActive(bar, activeBtn) {
+    bar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    activeBtn.classList.add('active');
+  }
+}
+
+function _openBlogEditor(metadata, existingContent) {
+  _initQuill();
+  _pendingBlogData = metadata;
+
+  document.getElementById('blog-editor-article-title').textContent = metadata.title;
+  const cat = BLOG_CATS[metadata.category] || {};
+  document.getElementById('blog-editor-meta').textContent =
+    `${cat.icon || '📝'} ${cat.label || metadata.category}  ·  ${metadata.author}`;
+
+  const publishBtn = document.getElementById('blog-editor-publish');
+  publishBtn.innerHTML = metadata.isEdit ? '&#128190; Enregistrer' : '&#128228; Publier';
+
+  _quill.root.innerHTML = existingContent || '';
+  document.getElementById('blog-editor-overlay').hidden = false;
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => _quill.focus(), 80);
+}
+
+function _closeBlogEditor() {
+  document.getElementById('blog-editor-overlay').hidden = true;
+  document.body.style.overflow = '';
+}
+
+function _publishBlogArticle() {
+  if (!_pendingBlogData) return;
+  const content = _quill.root.innerHTML.trim();
+  if (!content || content === '<p><br></p>') {
+    showToast('Le contenu de l\'article est vide.'); return;
+  }
+  const isEdit   = _pendingBlogData.isEdit;
+  const form     = document.getElementById('form-blog');
+  const formData = collectForm(form);
+  const title    = (formData.title  || _pendingBlogData.title).trim();
+  const category = formData.category || _pendingBlogData.category;
+  const author   = (formData.author || _pendingBlogData.author).trim();
+  if (!title || !category || !author) { showToast('Titre, catégorie et auteur sont requis.'); return; }
+  const cat = BLOG_CATS[category] || { label: category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+  const today = new Date().toISOString().split('T')[0];
+
+  const item = {
+    title:    title.trim(),
+    category,
+    catLabel: cat.label,
+    tagColor: cat.color,
+    icon:     cat.icon,
+    gradient: cat.gradient,
+    author:   author.trim(),
+    content,
+    createdAt: new Date().toISOString()
+  };
+
+  if (isEdit) {
+    const snap    = _blogSnap || {};
+    const original = getData(KEYS.blog).find(b => b.id === editingBlogId);
+    item.id   = editingBlogId;
+    item.date = original ? original.date : today;
+    _cache[KEYS.blog] = getData(KEYS.blog).map(b => b.id === editingBlogId ? item : b);
+    saveData(KEYS.blog, _cache[KEYS.blog]);
+    const changes = diffBlog(snap, item);
+    _closeBlogEditor();
+    cancelBlogEdit();
+    renderBlog();
+    showToast('Article modifié !');
+    if (changes.length) logNotification('blog_modified', `L'article « ${item.title} » a été modifié`, changes, '#blog');
+  } else {
+    item.date = today;
+    prepend(KEYS.blog, { id: genId('blog'), ...item });
+    logNotification('blog_added', `Nouvel article : « ${item.title} »`, [], '#blog');
+    _closeBlogEditor();
+    document.getElementById('form-blog').reset();
+    renderBlog();
+    showToast('Article publié !');
+  }
+}
+
 /* ─── Blog form handler ───────────────────────────────────────────── */
 function bindBlogForm() {
   document.getElementById('form-blog').addEventListener('submit', e => {
     e.preventDefault();
     const data = collectForm(e.target);
-    if (!data.title || !data.category || !data.author || !data.date || !data.excerpt) return;
-    const cat = BLOG_CATS[data.category] || { label: data.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
-    const item = {
-      title:    data.title.trim(),
-      category: data.category,
-      catLabel: cat.label,
-      tagColor: cat.color,
-      icon:     cat.icon,
-      gradient: cat.gradient,
-      author:   data.author.trim(),
-      date:     data.date,
-      excerpt:  data.excerpt.trim(),
-      createdAt: new Date().toISOString()
-    };
-    if (editingBlogId) {
-      const snap = _blogSnap || {};
-      item.id = editingBlogId;
-      _cache[KEYS.blog] = getData(KEYS.blog).map(b => b.id === editingBlogId ? item : b);
-      saveData(KEYS.blog, _cache[KEYS.blog]);
-      cancelBlogEdit();
-      renderBlog();
-      showToast('Article modifié !');
-      const changes = diffBlog(snap, item);
-      if (changes.length) logNotification('blog_modified', `L'article « ${item.title} » a été modifié`, changes, '#blog');
-    } else {
-      prepend(KEYS.blog, { id: genId('blog'), ...item });
-      logNotification('blog_added', `Nouvel article : « ${item.title} »`, [], '#blog');
-      e.target.reset();
-      renderBlog();
-      showToast('Article ajouté !');
-    }
+    if (!data.title || !data.category || !data.author) return;
+    const existingContent = editingBlogId
+      ? (getData(KEYS.blog).find(b => b.id === editingBlogId)?.content || '')
+      : '';
+    _openBlogEditor({ title: data.title, category: data.category, author: data.author, isEdit: !!editingBlogId }, existingContent);
+  });
+
+  document.getElementById('blog-editor-publish').addEventListener('click', _publishBlogArticle);
+  document.getElementById('blog-editor-cancel').addEventListener('click', _closeBlogEditor);
+  document.getElementById('blog-editor-close').addEventListener('click', _closeBlogEditor);
+  document.getElementById('blog-editor-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('blog-editor-overlay')) _closeBlogEditor();
   });
 }
 
@@ -699,10 +859,15 @@ function bindTableDeleteBtns(container) {
 }
 
 function deleteEventTable(tableId, eventId) {
-  _cache[KEYS.tables] = (_cache[KEYS.tables] || []).filter(t => t.id !== tableId);
-  saveData(KEYS.tables, _cache[KEYS.tables]);
-  refreshTableSection(eventId);
-  showToast('Table supprimée.');
+  showConfirm('Confirmez-vous la suppression de cette table ?', () => {
+    const table = (_cache[KEYS.tables] || []).find(t => t.id === tableId);
+    const ev    = getData(KEYS.events).find(e => e.id === eventId);
+    _cache[KEYS.tables] = (_cache[KEYS.tables] || []).filter(t => t.id !== tableId);
+    saveData(KEYS.tables, _cache[KEYS.tables]);
+    if (table) logNotification('table_deleted', `Table « ${table.gameName} » supprimée${ev ? ` de l'événement « ${ev.title} »` : ''}`, [], '#evenements', eventId);
+    refreshTableSection(eventId);
+    showToast('Table supprimée.');
+  });
 }
 
 function toggleCancelTable(tableId, eventId) {
@@ -711,8 +876,15 @@ function toggleCancelTable(tableId, eventId) {
   );
   saveData(KEYS.tables, _cache[KEYS.tables]);
   const table = _cache[KEYS.tables].find(t => t.id === tableId);
+  const ev    = getData(KEYS.events).find(e => e.id === eventId);
   refreshTableSection(eventId);
-  showToast(table && table.cancelled ? 'Table annulée.' : 'Table réactivée.');
+  if (table && table.cancelled) {
+    logNotification('table_cancelled',    `Table « ${table.gameName} » annulée${ev ? ` à l'événement « ${ev.title} »` : ''}`,    [], '#evenements', eventId);
+    showToast('Table annulée.');
+  } else {
+    logNotification('table_reactivated', `Table « ${table.gameName} » réactivée${ev ? ` à l'événement « ${ev.title} »` : ''}`, [], '#evenements', eventId);
+    showToast('Table réactivée.');
+  }
 }
 
 function refreshTableSection(eventId) {
@@ -957,7 +1129,10 @@ function renderGames() {
       </div>
     </div>`).join('');
 
-  bindDeleteButtons(list, KEYS.games, renderGames);
+  bindDeleteButtons(list, KEYS.games, renderGames, id => {
+    const g = getData(KEYS.games).find(g => g.id === id);
+    if (g) logNotification('game_deleted', `Le jeu « ${g.title} » a été supprimé`, [], '#jeux');
+  });
   list.querySelectorAll('.btn-edit[data-edit-game]').forEach(btn => {
     btn.addEventListener('click', () => {
       const item = getData(KEYS.games).find(g => g.id === btn.dataset.editGame);
@@ -1064,7 +1239,7 @@ function renderTeam() {
     </div>`;
   }).join('');
 
-  bindDeleteButtons(list, KEYS.team, renderTeam);
+  bindDeleteButtons(list, KEYS.team, renderTeam, null, 'name');
   bindEditTeamButtons(list);
 }
 
@@ -1159,7 +1334,10 @@ function renderBlog() {
       </div>
     </div>`;
   }).join('');
-  bindDeleteButtons(list, KEYS.blog, renderBlog);
+  bindDeleteButtons(list, KEYS.blog, renderBlog, id => {
+    const b = getData(KEYS.blog).find(b => b.id === id);
+    if (b) logNotification('blog_deleted', `L'article « ${b.title} » a été supprimé`, [], '#blog');
+  });
   list.querySelectorAll('.btn-edit[data-edit-blog]').forEach(btn => {
     btn.addEventListener('click', () => {
       const item = getData(KEYS.blog).find(b => b.id === btn.dataset.editBlog);
@@ -1176,10 +1354,8 @@ function populateBlogForm(item) {
   set('title',    item.title);
   set('category', item.category);
   set('author',   item.author);
-  set('date',     item.date);
-  set('excerpt',  item.excerpt);
   const submitBtn = form.querySelector('button[type="submit"]');
-  submitBtn.textContent = 'Enregistrer les modifications';
+  submitBtn.innerHTML = '&#9998; Modifier l\'article';
   if (!form.querySelector('.btn-cancel-edit')) {
     const cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
@@ -1189,7 +1365,7 @@ function populateBlogForm(item) {
     cancelBtn.addEventListener('click', cancelBlogEdit);
     submitBtn.after(cancelBtn);
   }
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  _openBlogEditor({ title: item.title, category: item.category, author: item.author, isEdit: true }, item.content || '');
 }
 
 function cancelBlogEdit() {
@@ -1197,7 +1373,7 @@ function cancelBlogEdit() {
   _blogSnap = null;
   const form = document.getElementById('form-blog');
   form.reset();
-  form.querySelector('button[type="submit"]').textContent = "Ajouter l'article";
+  form.querySelector('button[type="submit"]').innerHTML = "&#9998; Créer l'article";
   const cancelBtn = form.querySelector('.btn-cancel-edit');
   if (cancelBtn) cancelBtn.remove();
 }
@@ -1318,16 +1494,22 @@ function renderNotifications() {
   if (!subs.length && !evtSubs.length) {
     subList.innerHTML = '<p class="empty-msg">Aucun abonné.</p>';
   } else {
-    const regularHTML = subs.map(s => `
+    const TOPIC_LABELS = { tout: 'Tout', games: 'Jeux de rôles', events: 'Événements', blog: 'Blog' };
+    const regularHTML = subs.map(s => {
+      const topicsHtml = Array.isArray(s.topics) && s.topics.length
+        ? s.topics.map(t => `<span class="sub-topic-badge">${esc(TOPIC_LABELS[t] || t)}</span>`).join('')
+        : '<span class="sub-topic-badge">Tout</span>';
+      return `
       <div class="admin-item">
         <div class="admin-item-info">
           <div class="admin-item-title">&#128231; ${esc(s.email)}${s.notifCount ? ` <span class="sub-notif-count">${s.notifCount} mail${s.notifCount > 1 ? 's' : ''} envoyé${s.notifCount > 1 ? 's' : ''}</span>` : ''}</div>
-          <div class="admin-item-meta">${new Date(s.createdAt).toLocaleString('fr-FR')}</div>
+          <div class="admin-item-meta">${topicsHtml} &nbsp;·&nbsp; ${new Date(s.createdAt).toLocaleString('fr-FR')}</div>
         </div>
         <div class="admin-item-actions">
           <button class="btn-danger" data-delete-sub="${esc(s.id)}">Supprimer</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     const evtHTML = evtSubs.map(s => `
       <div class="admin-item">
@@ -1621,9 +1803,10 @@ function diffGame(snap, neo) {
 function diffBlog(snap, neo) {
   const ch = [];
   const n  = (v) => _norm(v);
-  for (const [k, label] of [['title','Titre'],['catLabel','Catégorie'],['author','Auteur'],['date','Date'],['excerpt','Extrait']]) {
+  for (const [k, label] of [['title','Titre'],['catLabel','Catégorie'],['author','Auteur']]) {
     if (n(snap[k]) !== n(neo[k])) ch.push(`${label} : ${n(snap[k])||'—'} → ${n(neo[k])||'—'}`);
   }
+  if (n(snap.content) !== n(neo.content)) ch.push('Contenu modifié');
   return ch;
 }
 
@@ -1645,16 +1828,45 @@ function logNotification(type, message, details = [], anchor = '', eventId = nul
   }).catch(() => {});
 }
 
+/* ─── Confirm modal ──────────────────────────────────────────────── */
+function showConfirm(message, onConfirm) {
+  const overlay = document.getElementById('confirm-overlay');
+  document.getElementById('confirm-msg').textContent = message;
+  overlay.removeAttribute('hidden');
+
+  const yes = document.getElementById('confirm-yes');
+  const no  = document.getElementById('confirm-no');
+
+  function cleanup() {
+    overlay.setAttribute('hidden', '');
+    yes.removeEventListener('click', onYes);
+    no.removeEventListener('click', onNo);
+    overlay.removeEventListener('click', onBg);
+  }
+  function onYes() { cleanup(); onConfirm(); }
+  function onNo()  { cleanup(); }
+  function onBg(e) { if (e.target === overlay) cleanup(); }
+
+  yes.addEventListener('click', onYes);
+  no.addEventListener('click', onNo);
+  overlay.addEventListener('click', onBg);
+}
+
 /* ─── Bind delete buttons ────────────────────────────────────────── */
-function bindDeleteButtons(container, key, reRender, beforeDelete) {
+function bindDeleteButtons(container, key, reRender, beforeDelete, nameField = 'title') {
   container.querySelectorAll('.btn-danger[data-delete]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id    = btn.dataset.delete;
-      if (beforeDelete) beforeDelete(id);
-      const items = getData(key).filter(item => item.id !== id);
-      saveData(key, items);
-      reRender();
-      showToast('Élément supprimé.');
+      const id   = btn.dataset.delete;
+      const item = getData(key).find(i => i.id === id);
+      const name = item ? item[nameField] : '';
+      const msg  = name ? `Confirmez-vous la suppression de « ${name} » ?` : 'Confirmez-vous la suppression ?';
+      showConfirm(msg, () => {
+        if (beforeDelete) beforeDelete(id);
+        const items = getData(key).filter(i => i.id !== id);
+        saveData(key, items);
+        reRender();
+        showToast('Élément supprimé.');
+      });
     });
   });
 }

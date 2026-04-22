@@ -353,10 +353,10 @@ const server = http.createServer(async (req, res) => {
         : `http://localhost:${PORT}`;
 
       const icons = {
-        game_added:'🎲', game_modified:'🎲',
+        game_added:'🎲',  game_modified:'🎲',  game_deleted:'🗑️',
         event_added:'📅', event_modified:'📅', event_deleted:'🗑️',
-        table_added:'🪑',
-        blog_added:'📝', blog_modified:'📝',
+        table_added:'🪑', table_deleted:'🗑️', table_cancelled:'❌', table_reactivated:'✅',
+        blog_added:'📝',  blog_modified:'📝',  blog_deleted:'🗑️',
       };
       const icon = icons[type] || '🔔';
 
@@ -394,14 +394,26 @@ const server = http.createServer(async (req, res) => {
       let sent = 0;
 
       // ── Abonnés généraux ──────────────────────────────────────────
+      const TOPIC_MAP = {
+        game_added:    'games',  game_modified:    'games',       game_deleted:     'games',
+        event_added:   'events', event_modified:   'events',      event_deleted:    'events',
+        table_added:   'events', table_deleted:    'events',      table_cancelled:  'events', table_reactivated: 'events',
+        blog_added:    'blog',   blog_modified:    'blog',        blog_deleted:     'blog',
+      };
+      const notifTopic = TOPIC_MAP[type];
+
       const subsFile = path.join(DATA, 'subscriptions.json');
       let subs = [];
       try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
       if (subs.length) {
-        for (const sub of subs) sub.notifCount = (sub.notifCount || 0) + 1;
+        const relevant = subs.filter(s => {
+          const topics = Array.isArray(s.topics) ? s.topics : ['tout'];
+          return topics.includes('tout') || (notifTopic && topics.includes(notifTopic));
+        });
+        for (const sub of relevant) sub.notifCount = (sub.notifCount || 0) + 1;
         fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
         if (isEmailConfigured()) {
-          for (const sub of subs) {
+          for (const sub of relevant) {
             const html = buildHtml(
               `${siteUrl}/unsubscribe?token=${encodeURIComponent(sub.token || sub.id)}`,
               'Se désabonner'
@@ -429,7 +441,7 @@ const server = http.createServer(async (req, res) => {
           }
           if (relevant.length) fs.writeFileSync(evtSubsFile, JSON.stringify(evtSubs.filter(s => s.eventId !== eventId)), 'utf8');
 
-        } else if (['event_added', 'event_modified', 'table_added'].includes(type)) {
+        } else if (['event_added', 'event_modified'].includes(type)) {
           const relevant = evtSubs.filter(s => s.eventId === eventId && s.eventMs > Date.now());
           if (relevant.length) {
             for (const sub of relevant) sub.notifCount = (sub.notifCount || 0) + 1;
@@ -479,6 +491,82 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
+      return;
+    }
+
+    // ── POST /api/subscribe ───────────────────────────────────────
+    if (pathname === '/api/subscribe' && req.method === 'POST') {
+      try {
+        const body   = JSON.parse(await readBody(req));
+        const email  = String(body.email  || '').trim().slice(0, 200);
+        const topics = Array.isArray(body.topics) ? body.topics.filter(t => ['tout','games','events','blog'].includes(t)) : [];
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Adresse e-mail invalide.' }));
+          return;
+        }
+        if (!topics.length) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Choisissez au moins un sujet.' }));
+          return;
+        }
+
+        const subsFile = path.join(DATA, 'subscriptions.json');
+        let subs = [];
+        try { subs = JSON.parse(fs.readFileSync(subsFile, 'utf8')); } catch {}
+
+        if (subs.find(s => s.email === email)) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Cette adresse est déjà abonnée.' }));
+          return;
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const id    = 'sub_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
+        const entry = { id, token, email, topics, createdAt: new Date().toISOString() };
+        subs.push(entry);
+        fs.writeFileSync(subsFile, JSON.stringify(subs), 'utf8');
+
+        const siteUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+          ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+          : `http://localhost:${PORT}`;
+
+        const topicLabels = { tout: 'Toutes les notifications', games: 'Jeux de rôles', events: 'Événements', blog: 'Articles de blog' };
+        const topicsList  = topics.map(t => `<li style="margin-bottom:.4rem;">${topicLabels[t] || t}</li>`).join('');
+        const unsubUrl    = `${siteUrl}/unsubscribe?token=${encodeURIComponent(token)}`;
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;background:#f0f0f0;margin:0;padding:2rem;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12);">
+  <div style="background:#0e0c1a;padding:1.5rem 2rem;">
+    <p style="color:#e8a020;margin:0;font-size:1.3rem;font-weight:700;">&#9670; Ried &amp; R&ocirc;le</p>
+    <p style="color:#aaa;margin:.3rem 0 0;font-size:.82rem;">Confirmation d'abonnement</p>
+  </div>
+  <div style="padding:2rem;">
+    <p style="font-size:1.05rem;color:#1a1a2e;margin:0 0 1rem;">🔔 Vous êtes maintenant abonné aux notifications de <strong>Ried &amp; Rôle</strong> !</p>
+    <p style="font-size:.92rem;color:#444;margin:0 0 .6rem;">Vous serez notifié pour :</p>
+    <ul style="margin:0 0 1.5rem;padding-left:1.2rem;color:#444;font-size:.92rem;line-height:1.8;">${topicsList}</ul>
+    <a href="${siteUrl}" style="display:inline-block;background:#e8a020;color:#0a0a0a;padding:.65rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;font-size:.9rem;">Visiter le site</a>
+    <hr style="border:none;border-top:1px solid #eee;margin:2rem 0 1rem;">
+    <p style="font-size:.75rem;color:#999;margin:0;line-height:1.6;">
+      Vous recevez cet e-mail car vous avez souscrit aux notifications de
+      <a href="${siteUrl}" style="color:#e8a020;text-decoration:none;">Ried &amp; Rôle</a>.<br>
+      <a href="${unsubUrl}" style="color:#999;">Se désabonner</a>
+    </p>
+  </div>
+</div></body></html>`;
+
+        if (isEmailConfigured()) {
+          try { await sendEmail({ to: email, subject: '[Ried & Rôle] Abonnement confirmé', html }); }
+          catch (err) { console.error('Email de confirmation non envoyé :', err.message); }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Erreur serveur.' }));
+      }
       return;
     }
 
