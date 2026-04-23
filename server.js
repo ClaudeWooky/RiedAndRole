@@ -562,14 +562,42 @@ const server = http.createServer(async (req, res) => {
 
         // Déléguer au bot si disponible
         if (isBotConfigured()) {
+          let dateStr;
           try {
-            const result = await callBot('/bot/event', { name, startIso, endIso, description, location });
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(result.body);
-            return;
-          } catch (err) {
-            console.warn('[discord-event] Bot indisponible, tentative via API directe :', err.message);
+            dateStr = new Date(startIso).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+          } catch {
+            dateStr = startIso;
           }
+          const details = [`📅 ${dateStr}`, `📍 ${location || 'À définir'}`];
+          if (description) details.push(description.slice(0, 200));
+
+          // Action principale : annoncer dans le salon events
+          let announceOk = false;
+          let announceErr = 'Bot indisponible';
+          let announceId;
+          try {
+            const r = await callBot('/bot/announce', { topic: 'events', type: 'event_added', title: name, details });
+            let b; try { b = JSON.parse(r.body); } catch { b = { ok: false }; }
+            if (b.ok) { announceOk = true; announceId = b.messageId; }
+            else announceErr = b.error || 'Erreur bot';
+          } catch (err) {
+            announceErr = err.message;
+          }
+
+          if (announceOk) {
+            // Bonus silencieux : créer l'événement planifié Discord
+            callBot('/bot/event', { name, startIso, endIso, description, location })
+              .then(r => { try { const b = JSON.parse(r.body); if (!b.ok) console.warn('[bot-event]', b.error); } catch {} })
+              .catch(err => console.warn('[bot-event]', err.message));
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, messageId: announceId }));
+            return;
+          }
+
+          // Annonce échouée → erreur directe sans passer par le fallback Discord
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Erreur bot : ' + announceErr }));
+          return;
         }
 
         // Fallback : appel direct à l'API Discord

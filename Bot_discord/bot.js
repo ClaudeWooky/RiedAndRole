@@ -124,7 +124,7 @@ const server = http.createServer(async (req, res) => {
         return json(400, { ok: false, error: 'La date de l\'événement est dans le passé — Discord n\'accepte que les événements futurs.' });
       }
 
-      const body = {
+      const eventPayload = {
         name:                 String(name).slice(0, 100),
         privacy_level:        2,
         scheduled_start_time: startIso,
@@ -132,9 +132,9 @@ const server = http.createServer(async (req, res) => {
         entity_type:          3,
         entity_metadata:      { location: String(location || 'Lieu à confirmer').slice(0, 100) },
       };
-      if (description) body.description = String(description).slice(0, 1000);
+      if (description) eventPayload.description = String(description).slice(0, 1000);
 
-      const event = await rest.post(Routes.guildScheduledEvents(GUILD_ID), { body });
+      const event = await rest.post(Routes.guildScheduledEvents(GUILD_ID), { body: eventPayload });
 
       console.log(`[bot] Événement créé : "${event.name}" (${event.id})`);
       return json(200, {
