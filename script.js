@@ -400,10 +400,10 @@ function loadDynamicBlog() {
     <article class="blog-article blog-article-clickable" data-blog-id="${escHtml(a.id)}">
       <div class="ba-img" style="${baImgStyle}">
         ${catImg ? '' : `<div class="ba-icon">${escHtml(a.icon || cat.icon)}</div>`}
+        <span class="tag tag-${escHtml(a.tagColor || cat.color)} ba-img-tag">${escHtml(a.catLabel || cat.label)}</span>
         <div class="ba-date">${escHtml(dateStr)}</div>
       </div>
       <div class="ba-body">
-        <div class="ba-cats"><span class="tag tag-${escHtml(a.tagColor || cat.color)}">${escHtml(a.catLabel || cat.label)}</span></div>
         <h2>${escHtml(a.title)}</h2>
         <div class="ba-meta">Par <strong>${escHtml(a.author)}</strong> | ${escHtml(dateStr)}</div>
         <p>${escHtml(_blogExcerpt(a.content))}</p>

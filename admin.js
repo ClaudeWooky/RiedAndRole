@@ -1423,7 +1423,13 @@ async function _sendDiscordBlog(blogId, btn) {
     const res  = await fetch('/api/discord-blog', {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ title: item.title, category: item.category, author: item.author, siteUrl: `${location.origin}${location.pathname.replace('admin.html','')}index.html#blog` })
+      body: JSON.stringify({
+        title:    item.title,
+        category: item.category,
+        author:   item.author,
+        excerpt:  (item.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000),
+        siteUrl:  `${location.origin}${location.pathname.replace('admin.html', '')}index.html#blog`
+      })
     });
     const data = await res.json();
     if (data.ok) showToast('Article posté sur Discord !');
