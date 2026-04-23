@@ -1,0 +1,15 @@
+{
+  "name": "ried-et-role-bot",
+  "version": "1.0.0",
+  "description": "Bot Discord pour Ried & Rôle",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3"
+  }
+}

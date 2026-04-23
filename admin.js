@@ -48,6 +48,7 @@ const BLOG_CATS = {
   'photos':         { label: 'Photos',                 color: 'teal',   icon: '📷', gradient: 'linear-gradient(135deg,#001014,#002535)' },
   'vie-asso':       { label: "Vie de l'asso",          color: 'pink',   icon: '🏠', gradient: 'linear-gradient(135deg,#1a0514,#5c0d3a)' },
   'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
+  'bons-plans':     { label: 'Bons plans',             color: 'yellow', icon: '💡', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)' },
 };
 
 /* ─── In-memory cache (populated by initData) ────────────────────── */
@@ -662,11 +663,11 @@ function _publishBlogArticle() {
     cancelBlogEdit();
     renderBlog();
     showToast('Article modifié !');
-    if (changes.length) logNotification('blog_modified', `L'article « ${item.title} » a été modifié`, changes, '#blog');
+    if (changes.length) logNotification('blog_modified', `L'article « ${item.title} » a été modifié`, changes, '#blog', null, category);
   } else {
     item.date = today;
     prepend(KEYS.blog, { id: genId('blog'), ...item });
-    logNotification('blog_added', `Nouvel article : « ${item.title} »`, [], '#blog');
+    logNotification('blog_added', `Nouvel article : « ${item.title} »`, [], '#blog', null, category);
     _closeBlogEditor();
     document.getElementById('form-blog').reset();
     renderBlog();
@@ -779,6 +780,7 @@ function renderEvents() {
           <button class="btn-registrations" data-reg-event="${esc(item.id)}" data-reg-title="${esc(item.title)}">
             Inscriptions <span class="reg-count">${getRegistrationCount(item.id)}</span>
           </button>
+          <button class="btn-discord-evt" data-discord-evt="${esc(item.id)}" title="Créer un événement sur Discord">&#128762; Discord</button>
           <button class="btn-edit" data-edit-event="${esc(item.id)}">Modifier</button>
           <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.events}">Supprimer</button>
         </div>
@@ -806,6 +808,68 @@ function renderEvents() {
     btn.addEventListener('click', () => openAddTableModal(btn.dataset.eventId, btn.dataset.eventTitle));
   });
   bindTableDeleteBtns(list);
+
+  list.querySelectorAll('.btn-discord-evt').forEach(btn => {
+    btn.addEventListener('click', () => _createDiscordEvent(btn.dataset.discordEvt, btn));
+  });
+}
+
+/* ─── Discord Event Creation ──────────────────────────────────── */
+const _MONTH_IDX = {Jan:0,Fév:1,Mar:2,Avr:3,Mai:4,Jun:5,Jul:6,'Aoû':7,Sep:8,Oct:9,Nov:10,'Déc':11};
+
+function _toDiscordISO(day, month, year, time) {
+  const m = _MONTH_IDX[month];
+  if (m === undefined || !day || !year) return null;
+  const [hh, mm] = (time || '09:00').replace('h', ':').split(':').map(n => parseInt(n) || 0);
+  // Paris timezone offset: CEST (UTC+2) Apr–Oct, CET (UTC+1) otherwise
+  const monthNum = m + 1;
+  const offset = (monthNum >= 4 && monthNum <= 10) ? 2 : 1;
+  return new Date(Date.UTC(parseInt(year), m, parseInt(day), hh - offset, mm)).toISOString();
+}
+
+async function _createDiscordEvent(eventId, btn) {
+  const item = getData(KEYS.events).find(e => e.id === eventId);
+  if (!item) return;
+
+  const startISO = _toDiscordISO(item.startDay || item.day, item.startMonth || item.month, item.startYear || item.year, item.startTimeFrom);
+  const endISO   = _toDiscordISO(item.endDay   || item.startDay || item.day, item.endMonth   || item.startMonth || item.month, item.endYear   || item.startYear || item.year, item.startTimeTo || item.startTimeFrom);
+  if (!startISO) {
+    showToast('Date de l\'événement invalide ou manquante.', true);
+    return;
+  }
+  // End time must be after start; default to start + 3h if missing or equal
+  const startMs = new Date(startISO).getTime();
+  let   endMs   = endISO ? new Date(endISO).getTime() : 0;
+  if (!endMs || endMs <= startMs) endMs = startMs + 3 * 3600 * 1000;
+  const endISOFinal = new Date(endMs).toISOString();
+
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res = await fetch('/api/discord-event', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        name:        item.title,
+        description: item.description || '',
+        startIso:    startISO,
+        endIso:      endISOFinal,
+        location:    item.location || 'À définir'
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('Événement Discord créé !');
+      if (data.url) window.open(data.url, '_blank');
+    } else {
+      showToast('Erreur Discord : ' + (data.error || 'inconnue'), true);
+    }
+  } catch (e) {
+    showToast('Erreur réseau.', true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#128762; Discord';
+  }
 }
 
 /* ─── Event Tables ────────────────────────────────────────────── */
@@ -1329,6 +1393,7 @@ function renderBlog() {
         </div>
       </div>
       <div class="admin-item-actions">
+        <button class="btn-discord-evt btn-discord-blog" data-discord-blog="${esc(item.id)}" title="Publier sur Discord">&#128762; Discord</button>
         <button class="btn-edit" data-edit-blog="${esc(item.id)}">Modifier</button>
         <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.blog}">Supprimer</button>
       </div>
@@ -1336,7 +1401,7 @@ function renderBlog() {
   }).join('');
   bindDeleteButtons(list, KEYS.blog, renderBlog, id => {
     const b = getData(KEYS.blog).find(b => b.id === id);
-    if (b) logNotification('blog_deleted', `L'article « ${b.title} » a été supprimé`, [], '#blog');
+    if (b) logNotification('blog_deleted', `L'article « ${b.title} » a été supprimé`, [], '#blog', null, b.category);
   });
   list.querySelectorAll('.btn-edit[data-edit-blog]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1344,6 +1409,31 @@ function renderBlog() {
       if (item) populateBlogForm(item);
     });
   });
+  list.querySelectorAll('.btn-discord-blog').forEach(btn => {
+    btn.addEventListener('click', () => _sendDiscordBlog(btn.dataset.discordBlog, btn));
+  });
+}
+
+async function _sendDiscordBlog(blogId, btn) {
+  const item = getData(KEYS.blog).find(b => b.id === blogId);
+  if (!item) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res  = await fetch('/api/discord-blog', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title: item.title, category: item.category, author: item.author, siteUrl: `${location.origin}${location.pathname.replace('admin.html','')}index.html#blog` })
+    });
+    const data = await res.json();
+    if (data.ok) showToast('Article posté sur Discord !');
+    else showToast('Erreur Discord : ' + (data.error || 'inconnue'), true);
+  } catch {
+    showToast('Erreur réseau.', true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#128762; Discord';
+  }
 }
 
 function populateBlogForm(item) {
@@ -1810,7 +1900,7 @@ function diffBlog(snap, neo) {
   return ch;
 }
 
-function logNotification(type, message, details = [], anchor = '', eventId = null) {
+function logNotification(type, message, details = [], anchor = '', eventId = null, category = null) {
   const entry = { id: genId('notif'), type, message, createdAt: new Date().toISOString() };
   const items = getData(KEYS.notif).slice();
   items.unshift(entry);
@@ -1820,7 +1910,7 @@ function logNotification(type, message, details = [], anchor = '', eventId = nul
   fetch('/api/notify', {
     method:  'POST',
     headers: getAuthHeaders(),
-    body:    JSON.stringify({ type, message, details, anchor, eventId })
+    body:    JSON.stringify({ type, message, details, anchor, eventId, category })
   }).then(r => r.json()).then(d => {
     if (!d.ok) return;
     if (d.sent > 0) showToast(`📧 ${d.sent} notification(s) envoyée(s).`);

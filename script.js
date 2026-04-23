@@ -19,9 +19,9 @@ const _data = { events: [], games: [], team: [], registrations: [], tables: [], 
 const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions' };
 
 const BLOG_CATS = {
-  'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' },
-  'critique':       { label: 'Critique de jeu',        color: 'purple', icon: '🎮', gradient: 'linear-gradient(135deg,#1a0a2e,#4b1c7d)' },
-  'evenement':      { label: 'Événement',              color: 'red',    icon: '🎉', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)' },
+  'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)', image: '/assets/blog/annonce.png' },
+  'critique':       { label: 'Critique de jeu',        color: 'purple', icon: '🎮', gradient: 'linear-gradient(135deg,#1a0a2e,#4b1c7d)', image: '/assets/blog/critique.png' },
+  'evenement':      { label: 'Événement',              color: 'red',    icon: '🎉', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)', image: '/assets/blog/evenement.png' },
   'conseil-mj':     { label: 'Conseil MJ',             color: 'orange', icon: '📜', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
   'conseil-joueur': { label: 'Conseil Joueur',         color: 'green',  icon: '🎲', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)' },
   'photos':         { label: 'Photos',                 color: 'teal',   icon: '📷', gradient: 'linear-gradient(135deg,#001014,#002535)' },
@@ -339,8 +339,24 @@ function _openBlogArticle(id) {
   const a = (_data.blog || []).find(b => b.id === id);
   if (!a) return;
   const cat = BLOG_CATS[a.category] || { label: a.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
-  document.getElementById('bam-header').style.background = a.gradient || cat.gradient;
-  document.getElementById('bam-icon').textContent  = a.icon || cat.icon;
+  const bamHeader = document.getElementById('bam-header');
+  const bamIcon   = document.getElementById('bam-icon');
+  const catImg    = cat.image || a.image;
+  if (catImg) {
+    bamHeader.style.background      = '#111';
+    bamHeader.style.backgroundImage = `url('${catImg}')`;
+    bamHeader.style.backgroundSize  = 'cover';
+    bamHeader.style.backgroundPosition = 'center';
+    bamIcon.textContent = '';
+    bamIcon.style.display = 'none';
+  } else {
+    bamHeader.style.background      = a.gradient || cat.gradient;
+    bamHeader.style.backgroundImage = '';
+    bamHeader.style.backgroundSize  = '';
+    bamHeader.style.backgroundPosition = '';
+    bamIcon.textContent = a.icon || cat.icon;
+    bamIcon.style.display = '';
+  }
   document.getElementById('bam-tag').textContent   = a.catLabel || cat.label;
   document.getElementById('bam-tag').className     = `tag tag-${escHtml(a.tagColor || cat.color)}`;
   document.getElementById('bam-title').textContent = a.title;
@@ -353,11 +369,14 @@ function _openBlogArticle(id) {
 function _initBlogArticleModal() {
   const overlay = document.getElementById('blog-article-overlay');
   if (!overlay) return;
-  document.getElementById('bam-close').addEventListener('click', () => {
-    overlay.hidden = true; document.body.style.overflow = '';
-  });
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) { overlay.hidden = true; document.body.style.overflow = ''; }
+
+  function close() { overlay.hidden = true; document.body.style.overflow = ''; }
+  document.getElementById('bam-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  document.getElementById('bam-share-fb').addEventListener('click', () => {
+    const url = `${location.origin}${location.pathname}#blog`;
+    window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank', 'width=620,height=450,noopener');
   });
 }
 
@@ -373,10 +392,14 @@ function loadDynamicBlog() {
   container.innerHTML = articles.map(a => {
     const cat = BLOG_CATS[a.category] || { label: a.category, color: 'blue', icon: '📰', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
     const dateStr = formatBlogDate(a.date);
+    const catImg  = cat.image || a.image;
+    const baImgStyle = catImg
+      ? `background:#111;background-image:url('${escHtml(catImg)}');background-size:cover;background-position:center`
+      : `background:${escHtml(a.gradient || cat.gradient)}`;
     return `
     <article class="blog-article blog-article-clickable" data-blog-id="${escHtml(a.id)}">
-      <div class="ba-img" style="background:${escHtml(a.gradient || cat.gradient)};">
-        <div class="ba-icon">${escHtml(a.icon || cat.icon)}</div>
+      <div class="ba-img" style="${baImgStyle}">
+        ${catImg ? '' : `<div class="ba-icon">${escHtml(a.icon || cat.icon)}</div>`}
         <div class="ba-date">${escHtml(dateStr)}</div>
       </div>
       <div class="ba-body">
@@ -425,11 +448,15 @@ function loadHomeBlog() {
     const parts = (a.date || '').split('-');
     const dayNum = parts[2] ? parseInt(parts[2], 10) : '';
     const monStr = parts[1] ? (months[parseInt(parts[1], 10) - 1] || '') : '';
+    const catImg  = cat.image || a.image;
+    const cardImgStyle = catImg
+      ? `background:#111;background-image:url('${escHtml(catImg)}');background-size:cover;background-position:center`
+      : `background:${escHtml(a.gradient || cat.gradient)}`;
     return `
     <article class="blog-card${i === 0 ? ' wide' : ''}">
-      <div class="blog-card-img" style="background:${escHtml(a.gradient || cat.gradient)};">
+      <div class="blog-card-img" style="${cardImgStyle}">
         <div class="blog-date-badge"><span>${escHtml(String(dayNum))}</span><span>${escHtml(monStr)}</span></div>
-        <div class="blog-card-icon">${escHtml(a.icon || cat.icon)}</div>
+        ${catImg ? '' : `<div class="blog-card-icon">${escHtml(a.icon || cat.icon)}</div>`}
       </div>
       <div class="blog-card-body">
         <span class="tag tag-${escHtml(a.tagColor || cat.color)}">${escHtml(a.catLabel || cat.label)}</span>

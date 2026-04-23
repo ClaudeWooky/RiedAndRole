@@ -37,9 +37,42 @@ function smtpSecure() { return (process.env.SMTP_SECURE || String(_cfg.smtpSecur
 function smtpUser()   { return process.env.SMTP_USER   || _cfg.smtpUser   || ''; }
 function smtpPass()   { return process.env.SMTP_PASS   || _cfg.smtpPass   || ''; }
 function smtpFrom()   { return process.env.SMTP_FROM   || _cfg.smtpFrom   || (smtpUser() ? `"Ried & Rôle" <${smtpUser()}>` : '"Ried & Rôle" <ried.and.role@gmail.com>'); }
-function sgKey()      { return process.env.SENDGRID_API_KEY || _cfg.sendgridApiKey || ''; }
+function sgKey()           { return process.env.SENDGRID_API_KEY  || _cfg.sendgridApiKey  || ''; }
+function discordBotToken() { return process.env.DISCORD_BOT_TOKEN || _cfg.discordBotToken || ''; }
+function discordGuildId()  { return process.env.DISCORD_GUILD_ID  || _cfg.discordGuildId  || ''; }
 
-function isEmailConfigured() { return !!(sgKey() || (nodemailer && smtpHost())); }
+function isEmailConfigured()   { return !!(sgKey() || (nodemailer && smtpHost())); }
+function isDiscordConfigured() { return !!(discordBotToken() && discordGuildId()); }
+
+function botWebhookUrl()    { return process.env.BOT_WEBHOOK_URL    || _cfg.botWebhookUrl    || ''; }
+function botWebhookSecret() { return process.env.BOT_WEBHOOK_SECRET || _cfg.botWebhookSecret || ''; }
+function isBotConfigured()  { return !!(botWebhookUrl() && botWebhookSecret()); }
+
+async function callBot(endpoint, data) {
+  const url     = new URL(endpoint, botWebhookUrl());
+  const payload = JSON.stringify(data);
+  const mod     = url.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = mod.request({
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === 'https:' ? 443 : 80),
+      path:     url.pathname,
+      method:   'POST',
+      headers:  {
+        'x-bot-secret':   botWebhookSecret(),
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: d }));
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
 
 function _parsedFrom() {
   const raw = smtpFrom();
@@ -346,7 +379,7 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
 
-      const { type, message, details, anchor, eventId } = JSON.parse(await readBody(req));
+      const { type, message, details, anchor, eventId, category } = JSON.parse(await readBody(req));
 
       const siteUrl  = process.env.RAILWAY_PUBLIC_DOMAIN
         ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -460,6 +493,25 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      // Poster sur Discord via le bot si configuré
+      if (isBotConfigured()) {
+        // Blog → /bot/blog avec routage par catégorie
+        if (type === 'blog_added' || type === 'blog_modified') {
+          callBot('/bot/blog', {
+            title: message, category: category || null,
+            siteUrl: `${siteUrl}${anchor || ''}`
+          }).catch(err => console.error('[bot-blog]', err.message));
+        }
+        // Jeux → /bot/announce salon games
+        else if (type === 'game_added' || type === 'game_modified' || type === 'game_deleted') {
+          callBot('/bot/announce', {
+            topic: 'games', type, title: message, details,
+            url:   `${siteUrl}${anchor || ''}`
+          }).catch(err => console.error('[bot-announce]', err.message));
+        }
+        // Les événements passent par /api/discord-event → /bot/event (Server Events Discord)
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, sent }));
       return;
@@ -491,6 +543,120 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
+      return;
+    }
+
+    // ── POST /api/discord-event ───────────────────────────────────
+    if (pathname === '/api/discord-event' && req.method === 'POST') {
+      const session = getSession(req);
+      if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
+
+      if (!isBotConfigured() && !isDiscordConfigured()) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Discord non configuré. Ajoutez les paramètres Discord dans config.json ou les variables d\'environnement.' }));
+        return;
+      }
+
+      try {
+        const { name, startIso, endIso, description, location } = JSON.parse(await readBody(req));
+
+        // Déléguer au bot si disponible
+        if (isBotConfigured()) {
+          try {
+            const result = await callBot('/bot/event', { name, startIso, endIso, description, location });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(result.body);
+            return;
+          } catch (err) {
+            console.warn('[discord-event] Bot indisponible, tentative via API directe :', err.message);
+          }
+        }
+
+        // Fallback : appel direct à l'API Discord
+        if (!isDiscordConfigured()) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Bot indisponible et Discord non configuré en direct.' }));
+          return;
+        }
+
+        const payload = JSON.stringify({
+          name:                   String(name).slice(0, 100),
+          privacy_level:          2,
+          scheduled_start_time:   startIso,
+          scheduled_end_time:     endIso,
+          entity_type:            3,
+          entity_metadata:        { location: String(location || 'Lieu à confirmer').slice(0, 100) },
+          ...(description ? { description: String(description).slice(0, 1000) } : {})
+        });
+
+        const guildId = discordGuildId();
+        const result  = await new Promise((resolve, reject) => {
+          const dreq = https.request({
+            hostname: 'discord.com',
+            path:     `/api/v10/guilds/${guildId}/scheduled-events`,
+            method:   'POST',
+            headers:  {
+              'Authorization':  `Bot ${discordBotToken()}`,
+              'Content-Type':   'application/json',
+              'Content-Length': Buffer.byteLength(payload)
+            }
+          }, dres => {
+            let d = '';
+            dres.on('data', c => d += c);
+            dres.on('end', () => resolve({ status: dres.statusCode, body: d }));
+          });
+          dreq.on('error', reject);
+          dreq.write(payload);
+          dreq.end();
+        });
+
+        if (result.status >= 400) {
+          let errMsg = `Erreur Discord ${result.status}`;
+          try { errMsg = JSON.parse(result.body).message || errMsg; } catch {}
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: errMsg }));
+        } else {
+          let created;
+          try { created = JSON.parse(result.body); } catch { created = {}; }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, url: created.id ? `https://discord.com/events/${guildId}/${created.id}` : null }));
+        }
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Erreur serveur : ' + err.message }));
+      }
+      return;
+    }
+
+    // ── POST /api/discord-blog ────────────────────────────────────
+    if (pathname === '/api/discord-blog' && req.method === 'POST') {
+      const session = getSession(req);
+      if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
+
+      if (!isBotConfigured()) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Bot Discord non configuré (botWebhookUrl / botWebhookSecret manquants).' }));
+        return;
+      }
+
+      try {
+        const { title, category, author, siteUrl: articleUrl } = JSON.parse(await readBody(req));
+        if (!title) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'title requis' })); return; }
+
+        const _siteUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+          ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+          : `http://localhost:${PORT}`;
+
+        const result = await callBot('/bot/blog', {
+          title, category: category || null, author: author || null,
+          siteUrl: articleUrl || `${_siteUrl}#blog`
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(result.body);
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Erreur bot : ' + err.message }));
+      }
       return;
     }
 
