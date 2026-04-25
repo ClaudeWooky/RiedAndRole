@@ -47,10 +47,10 @@ const BLOG_CATS = {
   'evenement':      { label: 'Événement',              color: 'red',    icon: '🎉', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)' },
   'conseil-mj':     { label: 'Conseil MJ',             color: 'orange', icon: '📜', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
   'conseil-joueur': { label: 'Conseil Joueur',         color: 'green',  icon: '🎲', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)' },
-  'photos':         { label: 'Photos',                 color: 'teal',   icon: '📷', gradient: 'linear-gradient(135deg,#001014,#002535)' },
-  'vie-asso':       { label: "Vie de l'asso",          color: 'pink',   icon: '🏠', gradient: 'linear-gradient(135deg,#1a0514,#5c0d3a)' },
-  'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
-  'bons-plans':     { label: 'Bons plans',             color: 'yellow', icon: '💡', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)' },
+  'photos':         { label: 'Photos',                 color: 'teal',   icon: '📷', gradient: 'linear-gradient(135deg,#001014,#002535)', image: '/assets/blog/photos.png' },
+  'vie-asso':       { label: "Vie de l'asso",          color: 'pink',   icon: '🏠', gradient: 'linear-gradient(135deg,#1a0514,#5c0d3a)', image: '/assets/blog/asso.png' },
+  'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)', image: '/assets/blog/cr.png' },
+  'bons-plans':     { label: 'Bons plans',             color: 'yellow', icon: '💡', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)', image: '/assets/blog/bonsPlans.png' },
   'culture-geek':   { label: 'Culture Geek',           color: 'cyan',   icon: '🤓', gradient: 'linear-gradient(135deg,#001a1a,#004d4d)' },
 };
 
