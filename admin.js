@@ -558,6 +558,23 @@ function _initQuill() {
       ]
     }
   });
+
+  // Bouton SVG dans la barre d'outils
+  const tbContainer = _quill.getModule('toolbar').container;
+  const grp = document.createElement('span');
+  grp.className = 'ql-formats';
+  const svgBtn = document.createElement('button');
+  svgBtn.type = 'button';
+  svgBtn.className = 'ql-svg-insert';
+  svgBtn.title = 'Insérer un SVG';
+  svgBtn.innerHTML = `<svg viewBox="0 0 18 18" width="18" height="18">
+    <polygon points="9,1 17,9 9,17 1,9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="9" y="12" text-anchor="middle" font-size="5" font-weight="bold" fill="currentColor" font-family="sans-serif">SVG</text>
+  </svg>`;
+  grp.appendChild(svgBtn);
+  tbContainer.appendChild(grp);
+  svgBtn.addEventListener('click', e => { e.preventDefault(); _openSvgPicker(); });
+
   _initQuillImageResize(_quill);
 }
 
@@ -787,6 +804,80 @@ function bindBlogForm() {
   document.getElementById('blog-editor-overlay').addEventListener('click', e => {
     if (e.target === document.getElementById('blog-editor-overlay')) _closeBlogEditor();
   });
+  document.getElementById('svg-picker-close').addEventListener('click', _closeSvgPicker);
+  document.getElementById('svg-picker-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('svg-picker-overlay')) _closeSvgPicker();
+  });
+}
+
+async function _openSvgPicker() {
+  const overlay = document.getElementById('svg-picker-overlay');
+  const grid = document.getElementById('svg-picker-grid');
+  grid.innerHTML = '<p class="svg-picker-empty">Chargement…</p>';
+  overlay.hidden = false;
+
+  let files = [];
+  try {
+    const res = await fetch('/api/blog-svgs');
+    files = await res.json();
+  } catch { /* ignore */ }
+
+  if (!files.length) {
+    grid.innerHTML = '<p class="svg-picker-empty">Aucun SVG trouvé dans assets/blog/svg/</p>';
+    return;
+  }
+
+  grid.innerHTML = '';
+  files.forEach(name => {
+    const item = document.createElement('div');
+    item.className = 'svg-picker-item';
+    item.innerHTML = `<img src="/assets/blog/svg/${encodeURIComponent(name)}" alt="${name}">
+      <span>${name}</span>`;
+    item.addEventListener('click', () => _insertSvgIntoEditor(name));
+    grid.appendChild(item);
+  });
+}
+
+function _closeSvgPicker() {
+  document.getElementById('svg-picker-overlay').hidden = true;
+}
+
+function _insertSvgIntoEditor(name) {
+  _closeSvgPicker();
+  const url = '/assets/blog/svg/' + encodeURIComponent(name);
+  const range = _quill.getSelection(true);
+  const idx = range ? range.index : _quill.getLength();
+
+  // Taille de police courante au curseur
+  const fontSize = _getQuillFontSizeAtCursor(range);
+
+  _quill.insertEmbed(idx, 'image', url);
+  _quill.setSelection(idx + 1);
+
+  // Appliquer la taille après insertion
+  setTimeout(() => {
+    const imgs = _quill.root.querySelectorAll(`img[src="${url}"]`);
+    const img = imgs[imgs.length - 1];
+    if (img) {
+      img.style.width  = fontSize;
+      img.style.height = fontSize;
+      img.style.verticalAlign = 'middle';
+    }
+  }, 0);
+}
+
+function _getQuillFontSizeAtCursor(range) {
+  const idx = range ? range.index : 0;
+  try {
+    const [leaf] = _quill.getLeaf(idx > 0 ? idx - 1 : 0);
+    if (leaf && leaf.domNode) {
+      const el = leaf.domNode.nodeType === Node.TEXT_NODE
+        ? leaf.domNode.parentElement
+        : leaf.domNode;
+      return window.getComputedStyle(el).fontSize;
+    }
+  } catch { /* ignore */ }
+  return window.getComputedStyle(_quill.root).fontSize;
 }
 
 /* ─── Auto-fill game tag from category ───────────────────────────── */

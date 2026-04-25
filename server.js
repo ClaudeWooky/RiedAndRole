@@ -976,6 +976,21 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── GET /api/blog-svgs ────────────────────────────────────────
+    if (pathname === '/api/blog-svgs' && req.method === 'GET') {
+      const svgDir = path.join(ROOT, 'assets', 'blog', 'svg');
+      try {
+        const files = await fs.promises.readdir(svgDir);
+        const svgs = files.filter(f => f.toLowerCase().endsWith('.svg'));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(svgs));
+      } catch {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('[]');
+      }
+      return;
+    }
+
     // ── Data API : GET|POST /data/<name>.json ──────────────────────
     if (/^\/data\/[\w-]+\.json$/.test(pathname)) {
       const file = path.join(DATA, path.basename(pathname));

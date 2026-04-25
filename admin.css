@@ -154,6 +154,20 @@ ul { list-style: none; }
 #blog-quill-editor .ql-editor.ql-blank::before { color:#bbb;font-style:italic; }
 .blog-editor-footer { display:flex;align-items:center;justify-content:flex-end;gap:.8rem;padding:.8rem 1.4rem;background:#f4f4f4;border-top:1px solid #ddd;flex-shrink:0; }
 
+/* ─── Bouton SVG dans toolbar Quill ─────────────────────────────── */
+.ql-svg-insert { display:inline-flex;align-items:center;justify-content:center; }
+.ql-svg-insert svg { pointer-events:none; }
+
+/* ─── SVG picker modal ───────────────────────────────────────────── */
+.svg-picker-card { background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.5);width:min(600px,94vw);max-height:80vh;display:flex;flex-direction:column; }
+.svg-picker-header { display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.2rem;background:#0e0c1a;border-bottom:2px solid #e8a020;font-family:'Cinzel',serif;color:#e8a020;font-size:.95rem;font-weight:700;flex-shrink:0; }
+.svg-picker-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.8rem;padding:1rem;overflow-y:auto; }
+.svg-picker-item { display:flex;flex-direction:column;align-items:center;gap:.4rem;padding:.6rem;border:1px solid #ddd;border-radius:6px;cursor:pointer;transition:all .15s;background:#fafafa; }
+.svg-picker-item:hover { border-color:#e8a020;background:rgba(232,160,32,.08); }
+.svg-picker-item img { width:72px;height:72px;object-fit:contain; }
+.svg-picker-item span { font-size:.72rem;color:#555;text-align:center;word-break:break-all;line-height:1.2; }
+.svg-picker-empty { padding:2rem;text-align:center;color:#999;font-size:.9rem; }
+
 /* ─── Quill image resize bar ─────────────────────────────────────── */
 #ql-img-resize-bar { position:absolute;z-index:9999;display:flex;align-items:center;gap:.3rem;background:#1a1530;border:1px solid #e8a020;border-radius:6px;padding:.35rem .6rem;box-shadow:0 4px 16px rgba(0,0,0,.5);white-space:nowrap; }
 #ql-img-resize-bar .ql-resize-label { font-size:.75rem;color:#aaa;margin-right:.2rem; }
