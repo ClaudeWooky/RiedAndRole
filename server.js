@@ -88,6 +88,7 @@ const _BOT_ICONS = {
   table_added:'🪑', table_cancelled:'❌', table_reactivated:'✅',
   game_added:'🎲',  game_modified:'🎲',  game_deleted:'🗑️',
   blog_added:'📝',  blog_modified:'📝',  blog_deleted:'🗑️',
+  agenda_added:'📆', agenda_modified:'📆', agenda_deleted:'🗑️',
 };
 
 async function botAnnounce(topic, type, title, details, url) {
@@ -504,6 +505,7 @@ const server = http.createServer(async (req, res) => {
         event_added:'📅', event_modified:'📅', event_deleted:'🗑️',
         table_added:'🪑', table_deleted:'🗑️', table_cancelled:'❌', table_reactivated:'✅',
         blog_added:'📝',  blog_modified:'📝',  blog_deleted:'🗑️',
+        agenda_added:'📆', agenda_modified:'📆', agenda_deleted:'🗑️',
       };
       const icon = icons[type] || '🔔';
 
@@ -546,6 +548,7 @@ const server = http.createServer(async (req, res) => {
         event_added:   'events', event_modified:   'events',      event_deleted:    'events',
         table_added:   'events', table_deleted:    'events',      table_cancelled:  'events', table_reactivated: 'events',
         blog_added:    'blog',   blog_modified:    'blog',        blog_deleted:     'blog',
+        agenda_added:  'agenda', agenda_modified:  'agenda',      agenda_deleted:   'agenda',
       };
       const notifTopic = TOPIC_MAP[type];
 
@@ -771,7 +774,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const body   = JSON.parse(await readBody(req));
         const email  = String(body.email  || '').trim().slice(0, 200);
-        const topics = Array.isArray(body.topics) ? body.topics.filter(t => ['tout','games','events','blog'].includes(t)) : [];
+        const topics = Array.isArray(body.topics) ? body.topics.filter(t => ['tout','games','events','blog','agenda'].includes(t)) : [];
 
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -804,7 +807,7 @@ const server = http.createServer(async (req, res) => {
           ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
           : `http://localhost:${PORT}`;
 
-        const topicLabels = { tout: 'Toutes les notifications', games: 'Jeux de rôles', events: 'Événements', blog: 'Articles de blog' };
+        const topicLabels = { tout: 'Toutes les notifications', games: 'Jeux de rôles', events: 'Événements', blog: 'Articles de blog', agenda: 'Agenda' };
         const topicsList  = topics.map(t => `<li style="margin-bottom:.4rem;">${topicLabels[t] || t}</li>`).join('');
         const unsubUrl    = `${siteUrl}/unsubscribe?token=${encodeURIComponent(token)}`;
 

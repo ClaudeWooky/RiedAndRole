@@ -1753,7 +1753,7 @@ function renderNotifications() {
   if (!subs.length && !evtSubs.length) {
     subList.innerHTML = '<p class="empty-msg">Aucun abonné.</p>';
   } else {
-    const TOPIC_LABELS = { tout: 'Tout', games: 'Jeux de rôles', events: 'Événements', blog: 'Blog' };
+    const TOPIC_LABELS = { tout: 'Tout', games: 'Jeux de rôles', events: 'Événements', blog: 'Blog', agenda: 'Agenda' };
     const regularHTML = subs.map(s => {
       const topicsHtml = Array.isArray(s.topics) && s.topics.length
         ? s.topics.map(t => `<span class="sub-topic-badge">${esc(TOPIC_LABELS[t] || t)}</span>`).join('')
@@ -2331,7 +2331,10 @@ function renderAgenda() {
     </div>`;
   }).join('');
 
-  bindDeleteButtons(list, KEYS.agenda, renderAgenda, null, 'title');
+  bindDeleteButtons(list, KEYS.agenda, renderAgenda, id => {
+    const ag = getData(KEYS.agenda).find(i => i.id === id);
+    if (ag) logNotification('agenda_deleted', `Agenda : « ${ag.title} » supprimé`, [], '#agenda');
+  }, 'title');
 
   list.querySelectorAll('.btn-edit').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2420,10 +2423,13 @@ function bindAgendaForm() {
       saveData(KEYS.agenda, items);
       cancelAgendaEdit();
       showToast('Entrée modifiée !');
+      logNotification('agenda_modified', `Agenda : « ${fields.title} » modifié`, [`📅 ${fields.date}${fields.timeStart ? ' à ' + fields.timeStart : ''}`], '#agenda');
     } else {
-      prepend(KEYS.agenda, { id: genId('agenda'), ...fields });
+      const _newAgendaId = genId('agenda');
+      prepend(KEYS.agenda, { id: _newAgendaId, ...fields });
       _resetAgendaForm(e.target);
       showToast('Entrée ajoutée !');
+      logNotification('agenda_added', `Agenda : nouvelle entrée « ${fields.title} »`, [`📅 ${fields.date}${fields.timeStart ? ' à ' + fields.timeStart : ''}`], '#agenda');
     }
     renderAgenda();
   });
