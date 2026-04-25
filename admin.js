@@ -536,11 +536,37 @@ function bindGameImageInput() {
 }
 
 /* ─── Blog editor (Quill) ─────────────────────────────────────────── */
-let _quill          = null;
+let _quill           = null;
 let _pendingBlogData = null;
+let _svgInsertRange  = null; // sélection sauvée avant ouverture du picker
 
 function _initQuill() {
   if (_quill) return;
+
+  // Blot inline pour les SVG (Quill 1.x traite 'image' comme BlockEmbed → saut de ligne)
+  if (!window._qlSvgBlotRegistered) {
+    const Embed = Quill.import('blots/embed');
+    class InlineSvgBlot extends Embed {
+      static create(value) {
+        const node = super.create();
+        node.setAttribute('data-src', value);
+        const img = document.createElement('img');
+        img.src = value;
+        img.style.verticalAlign = 'middle';
+        node.appendChild(img);
+        return node;
+      }
+      static value(node) {
+        return node.getAttribute('data-src') || '';
+      }
+    }
+    InlineSvgBlot.blotName  = 'svg-image';
+    InlineSvgBlot.tagName   = 'span';
+    InlineSvgBlot.className = 'ql-svg-inline';
+    Quill.register(InlineSvgBlot);
+    window._qlSvgBlotRegistered = true;
+  }
+
   _quill = new Quill('#blog-quill-editor', {
     theme: 'snow',
     placeholder: 'Écrivez votre article ici…',
@@ -811,6 +837,9 @@ function bindBlogForm() {
 }
 
 async function _openSvgPicker() {
+  // Sauvegarder la sélection AVANT que l'éditeur perde le focus
+  _svgInsertRange = _quill ? _quill.getSelection() : null;
+
   const overlay = document.getElementById('svg-picker-overlay');
   const grid = document.getElementById('svg-picker-grid');
   grid.innerHTML = '<p class="svg-picker-empty">Chargement…</p>';
@@ -845,23 +874,21 @@ function _closeSvgPicker() {
 function _insertSvgIntoEditor(name) {
   _closeSvgPicker();
   const url = '/assets/blog/svg/' + encodeURIComponent(name);
-  const range = _quill.getSelection(true);
-  const idx = range ? range.index : _quill.getLength();
-
-  // Taille de police courante au curseur
+  // Utiliser la sélection sauvée (avant perte de focus) ou fin du doc avant \n final
+  const range = _svgInsertRange;
+  const idx = range ? range.index : Math.max(0, _quill.getLength() - 1);
   const fontSize = _getQuillFontSizeAtCursor(range);
 
-  _quill.insertEmbed(idx, 'image', url);
+  // Blot inline : pas de saut de ligne contrairement à 'image' (BlockEmbed)
+  _quill.insertEmbed(idx, 'svg-image', url);
   _quill.setSelection(idx + 1);
 
-  // Appliquer la taille après insertion
   setTimeout(() => {
-    const imgs = _quill.root.querySelectorAll(`img[src="${url}"]`);
-    const img = imgs[imgs.length - 1];
+    const spans = _quill.root.querySelectorAll(`.ql-svg-inline[data-src="${CSS.escape(url)}"]`);
+    const img = spans[spans.length - 1]?.querySelector('img');
     if (img) {
       img.style.width  = fontSize;
       img.style.height = fontSize;
-      img.style.verticalAlign = 'middle';
     }
   }, 0);
 }
