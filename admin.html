@@ -54,6 +54,9 @@
         <button class="admin-nav-btn active" data-section="evenements">
           <span class="nav-icon">&#128197;</span> Événements
         </button>
+        <button class="admin-nav-btn" data-section="agenda">
+          <span class="nav-icon">&#128198;</span> Agenda
+        </button>
         <button class="admin-nav-btn" data-section="jeux">
           <span class="nav-icon">&#9876;</span> Jeux de Rôles
         </button>
@@ -384,6 +387,11 @@
                 </select>
               </div>
 
+              <div class="form-group" id="pseudo-mj-group">
+                <label>Pseudo MJ <small>(optionnel)</small></label>
+                <input type="text" name="pseudoMJ" placeholder="Nom utilisé en tant que Maître du Jeu" />
+              </div>
+
               <div class="form-group form-check" id="president-group">
                 <label>
                   <input type="checkbox" name="isPresident" />
@@ -435,13 +443,103 @@
                   <option value="vie-asso">🏠 Vie de l'asso</option>
                   <option value="compte-rendu">📖 Compte rendu de partie</option>
                   <option value="bons-plans">💡 Bons plans</option>
+                  <option value="culture-geek">🤓 Culture Geek</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>Auteur *</label>
-                <input type="text" name="author" placeholder="Prénom Nom" required />
+                <select id="blog-author-select">
+                  <option value="">— Choisir un auteur —</option>
+                </select>
+                <input type="text" id="blog-author-custom" placeholder="Prénom Nom" style="display:none; margin-top:.5rem;" />
+                <input type="hidden" name="author" id="blog-author-value" />
               </div>
               <button type="submit" class="btn btn-primary btn-full">&#9998; Créer l'article</button>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ═══════════════  SECTION AGENDA  ═════════════════════════ -->
+      <section id="section-agenda" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128197; Gestion de l'Agenda</h2>
+          <p>Les événements de la section Événements apparaissent automatiquement. Ajoutez ici des entrées supplémentaires avec une couleur personnalisée.</p>
+        </div>
+        <div class="admin-layout">
+
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Entrées manuelles</h3>
+              <span class="item-count" id="count-agenda">0</span>
+            </div>
+            <div id="list-agenda" class="admin-list">
+              <p class="empty-msg">Aucune entrée d'agenda.</p>
+            </div>
+          </div>
+
+          <div class="admin-form-panel">
+            <div class="panel-header">
+              <h3>Ajouter une entrée</h3>
+            </div>
+            <form id="form-agenda" novalidate>
+              <div class="form-group">
+                <label>Titre *</label>
+                <select id="agenda-title-select">
+                  <option value="Gros-jeu Ludoried">🎲 Gros-jeu Ludoried</option>
+                  <option value="Réunion bureau">🏛 Réunion bureau</option>
+                  <option value="__autre__">✏️ Autre</option>
+                </select>
+                <input type="text" id="agenda-title-custom" placeholder="Titre personnalisé" style="display:none; margin-top:.5rem;" />
+                <input type="hidden" name="title" id="agenda-title-value" value="Gros-jeu Ludoried" />
+              </div>
+
+              <div class="form-row form-row--date">
+                <div class="form-group">
+                  <label>Jour *</label>
+                  <input type="text" name="agendaDay" placeholder="00" maxlength="2" required />
+                </div>
+                <div class="form-group">
+                  <label>Mois *</label>
+                  <select name="agendaMonth" required>
+                    <option value="">—</option>
+                    <option>Jan</option><option>Fév</option><option>Mar</option>
+                    <option>Avr</option><option>Mai</option><option>Jun</option>
+                    <option>Jul</option><option>Aoû</option><option>Sep</option>
+                    <option>Oct</option><option>Nov</option><option>Déc</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Année *</label>
+                  <input type="text" name="agendaYear" placeholder="0000" maxlength="4" required />
+                </div>
+              </div>
+
+              <div id="agenda-time-group">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label id="agenda-time-label">Heure de début</label>
+                    <input type="time" name="timeStart" />
+                  </div>
+                  <div class="form-group">
+                    <label>Durée <span id="agenda-duration-req"></span></label>
+                    <div style="display:flex;gap:.4rem;align-items:center;">
+                      <input type="number" name="durationH" min="0" max="23" value="2" style="width:4.5rem;text-align:center;" />
+                      <span style="color:var(--text-muted);font-size:.85rem;">h</span>
+                      <select name="durationM" style="width:4.5rem;">
+                        <option value="0">00</option>
+                        <option value="15">15</option>
+                        <option value="30">30</option>
+                        <option value="45">45</option>
+                      </select>
+                      <span style="color:var(--text-muted);font-size:.85rem;">min</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">+ Ajouter l'entrée</button>
             </form>
           </div>
 
@@ -528,7 +626,8 @@
           <p>Fréquentation du site (30 derniers jours). Une adresse IP = un visiteur unique par jour.</p>
         </div>
         <div class="analytics-panel-wrap">
-          <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:.75rem;">
+          <div style="display:flex; align-items:center; justify-content:flex-end; gap:.6rem; margin-bottom:.75rem;">
+            <button type="button" id="btn-clear-analytics" class="btn-outline-sm btn-danger-sm">&#128465; Tout effacer</button>
             <button type="button" id="btn-refresh-analytics" class="btn-outline-sm">&#x27F3; Rafraîchir</button>
           </div>
           <div id="analytics-panel">

@@ -9,12 +9,13 @@ const SESSION_KEY = 'rr_admin_auth';
 const TOKEN_KEY   = 'rr_admin_token';
 const PERMS_KEY   = 'rr_admin_perms';
 
-const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', site: 'site' };
+const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', agenda: 'agenda', site: 'site' };
 
 let editingTeamId    = null;
 let editingEventId   = null;
 let editingGameId    = null;
 let editingBlogId    = null;
+let editingAgendaId  = null;
 let editingAccountId = null;
 let currentPhotoData     = null;
 let currentGameImageData = null;
@@ -28,6 +29,7 @@ let _blogSnap  = null;
 const KEYS = {
   events:    'events',
   games:     'games',
+  agenda:    'agenda',
   team:      'team',
   regs:      'registrations',
   tables:    'tables',
@@ -49,6 +51,7 @@ const BLOG_CATS = {
   'vie-asso':       { label: "Vie de l'asso",          color: 'pink',   icon: '🏠', gradient: 'linear-gradient(135deg,#1a0514,#5c0d3a)' },
   'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
   'bons-plans':     { label: 'Bons plans',             color: 'yellow', icon: '💡', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)' },
+  'culture-geek':   { label: 'Culture Geek',           color: 'cyan',   icon: '🤓', gradient: 'linear-gradient(135deg,#001a1a,#004d4d)' },
 };
 
 /* ─── In-memory cache (populated by initData) ────────────────────── */
@@ -81,6 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindGameImageInput();
   bindForms();
   bindBlogForm();
+  bindAgendaForm();
   bindSiteForm();
   bindAccountForm();
   renderAll();
@@ -93,7 +97,7 @@ function checkAuth() {
   if (sessionStorage.getItem(SESSION_KEY) === 'true') {
     showShell();
     const perms = JSON.parse(sessionStorage.getItem(PERMS_KEY) || 'null');
-    applyPermissions(perms || ['evenements','jeux','equipe','blog','site']);
+    applyPermissions(perms || ['evenements','agenda','jeux','equipe','blog','site']);
   }
 }
 
@@ -221,6 +225,31 @@ function bindSectionNav() {
 
   const refreshBtn = document.getElementById('btn-refresh-analytics');
   if (refreshBtn) refreshBtn.addEventListener('click', _fetchAndRenderAnalytics);
+
+  const clearBtn = document.getElementById('btn-clear-analytics');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    showConfirm(
+      'Effacer toutes les données analytics ? Cette action est irréversible.',
+      async () => {
+        clearBtn.disabled = true;
+        try {
+          await fetch('/data/analytics.json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+          });
+          _cache[KEYS.analytics] = {};
+          renderAnalytics();
+          showToast('Analytics effacées.');
+        } catch {
+          showToast('Erreur lors de l\'effacement.', true);
+        } finally {
+          clearBtn.disabled = false;
+        }
+      },
+      { labelYes: 'Confirmer', labelNo: 'Annuler' }
+    );
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -395,7 +424,8 @@ if (changes.length) logNotification('event_modified', `L'événement « ${fields
           games:       getSelectedGames(),
           gradient:    data.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
           type:        data.type || 'bureau',
-          isPresident: data.isPresident === 'on'
+          isPresident: data.isPresident === 'on',
+          pseudoMJ:    data.type !== 'mj' ? (data.pseudoMJ || '') : ''
         };
       });
       saveData(KEYS.team, items);
@@ -415,7 +445,8 @@ if (changes.length) logNotification('event_modified', `L'événement « ${fields
         games:       getSelectedGames(),
         gradient:    data.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
         type:        data.type || 'bureau',
-        isPresident: data.isPresident === 'on'
+        isPresident: data.isPresident === 'on',
+        pseudoMJ:    data.type !== 'mj' ? (data.pseudoMJ || '') : ''
       };
       prepend(KEYS.team, item);
       e.target.reset();
@@ -675,8 +706,63 @@ function _publishBlogArticle() {
   }
 }
 
+/* ─── Blog author select ──────────────────────────────────────────── */
+function populateAuthorSelect() {
+  const sel    = document.getElementById('blog-author-select');
+  const custom = document.getElementById('blog-author-custom');
+  const hidden = document.getElementById('blog-author-value');
+  if (!sel) return;
+
+  const savedValue = hidden ? hidden.value : '';
+
+  while (sel.options.length > 0) sel.remove(0);
+  sel.add(new Option('— Choisir un auteur —', ''));
+
+  const members = getData(KEYS.team).filter(m => m.type === 'bureau');
+  members.forEach(m => {
+    const label = (m.pseudoMJ && m.pseudoMJ.trim()) ? m.pseudoMJ.trim() : m.name;
+    sel.add(new Option(label, label));
+  });
+  sel.add(new Option('✏️ Autre', '__autre__'));
+
+  if (savedValue) {
+    const match = Array.from(sel.options).find(o => o.value === savedValue);
+    if (match) {
+      sel.value = savedValue;
+      if (custom) custom.style.display = 'none';
+    } else {
+      sel.value = '__autre__';
+      if (custom) { custom.value = savedValue; custom.style.display = 'block'; }
+    }
+  } else {
+    sel.value = '';
+    if (custom) { custom.value = ''; custom.style.display = 'none'; }
+  }
+}
+
+function bindAuthorSelect() {
+  const sel    = document.getElementById('blog-author-select');
+  const custom = document.getElementById('blog-author-custom');
+  const hidden = document.getElementById('blog-author-value');
+  if (!sel) return;
+
+  sel.addEventListener('change', () => {
+    if (sel.value === '__autre__') {
+      custom.style.display = 'block';
+      hidden.value = custom.value;
+    } else {
+      custom.style.display = 'none';
+      hidden.value = sel.value;
+    }
+  });
+
+  custom.addEventListener('input', () => { hidden.value = custom.value; });
+}
+
 /* ─── Blog form handler ───────────────────────────────────────────── */
 function bindBlogForm() {
+  bindAuthorSelect();
+
   document.getElementById('form-blog').addEventListener('submit', e => {
     e.preventDefault();
     const data = collectForm(e.target);
@@ -724,6 +810,7 @@ function getSelectedGames() {
 function bindMemberTypeToggle() {
   const typeSelect      = document.getElementById('member-type');
   const presidentGroup  = document.getElementById('president-group');
+  const pseudoMJGroup   = document.getElementById('pseudo-mj-group');
   const gamesGroup      = document.getElementById('games-group');
   const roleBadgeGroup  = document.getElementById('role-badge-group');
   const roleInput       = document.getElementById('role-input');
@@ -731,6 +818,7 @@ function bindMemberTypeToggle() {
   typeSelect.addEventListener('change', () => {
     const isMJ = typeSelect.value === 'mj';
     presidentGroup.style.display = isMJ ? 'none'  : 'block';
+    pseudoMJGroup.style.display  = isMJ ? 'none'  : 'block';
     gamesGroup.style.display     = isMJ ? 'block' : 'none';
     roleBadgeGroup.style.display = isMJ ? 'none'  : '';
     roleInput.required           = !isMJ;
@@ -746,6 +834,7 @@ function renderAll() {
   renderGames();
   renderTeam();
   renderBlog();
+  renderAgenda();
   renderSite();
 }
 
@@ -851,7 +940,7 @@ async function _createDiscordEvent(eventId, btn) {
       headers: getAuthHeaders(),
       body: JSON.stringify({
         name:        item.title,
-        description: item.description || '',
+        description: _htmlToDiscordMd(item.description || ''),
         startIso:    startISO,
         endIso:      endISOFinal,
         location:    item.location || 'À définir'
@@ -1326,6 +1415,7 @@ function populateTeamForm(item) {
   form.querySelector('[name="gradient"]').value  = item.gradient || '';
   form.querySelector('[name="type"]').value      = item.type || 'bureau';
   form.querySelector('[name="isPresident"]').checked = !!item.isPresident;
+  form.querySelector('[name="pseudoMJ"]').value  = item.pseudoMJ || '';
   document.getElementById('member-type').dispatchEvent(new Event('change'));
   populateGamesSelect(item.games || []);
 
@@ -1372,6 +1462,7 @@ function cancelTeamEdit() {
 
 /* ─── Blog list ──────────────────────────────────────────────────── */
 function renderBlog() {
+  populateAuthorSelect();
   const items = getData(KEYS.blog);
   const list  = document.getElementById('list-blog');
   const count = document.getElementById('count-blog');
@@ -1414,6 +1505,69 @@ function renderBlog() {
   });
 }
 
+function _htmlToDiscordMd(html) {
+  if (!html) return '';
+  let s = html;
+  // Supprime les images (traitées séparément via _extractFirstImageUrl)
+  s = s.replace(/<img\b[^>]*>/gi, '');
+  // h1/h2 → titres Discord ; h3-h6 → paragraphes simples
+  // (Quill utilise souvent <h3> comme conteneur de paragraphe normal)
+  s = s.replace(/<h1\b[^>]*>/gi, '\n# ').replace(/<\/h1>/gi, '\n');
+  s = s.replace(/<h2\b[^>]*>/gi, '\n## ').replace(/<\/h2>/gi, '\n');
+  s = s.replace(/<h[3-6]\b[^>]*>/gi, '\n').replace(/<\/h[3-6]>/gi, '\n\n');
+  // Paragraphes
+  s = s.replace(/<p\b[^>]*>/gi, '').replace(/<\/p>/gi, '\n\n');
+  // Sauts de ligne
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  // Listes
+  s = s.replace(/<li\b[^>]*>/gi, '• ').replace(/<\/li>/gi, '\n');
+  s = s.replace(/<\/?(ul|ol)\b[^>]*>/gi, '\n');
+  // Blockquote
+  s = s.replace(/<blockquote\b[^>]*>/gi, '\n> ').replace(/<\/blockquote>/gi, '\n');
+  // Code
+  s = s.replace(/<pre\b[^>]*>/gi, '\n```\n').replace(/<\/pre>/gi, '\n```\n');
+  s = s.replace(/<code\b[^>]*>/gi, '`').replace(/<\/code>/gi, '`');
+  // Tailles Quill : huge / large → gras
+  s = s.replace(/<span\b[^>]*ql-size-huge[^>]*>([\s\S]*?)<\/span>/gi, '**$1**');
+  s = s.replace(/<span\b[^>]*ql-size-large[^>]*>([\s\S]*?)<\/span>/gi, '**$1**');
+  // Gras — \b évite de matcher <blockquote>, <bdi>…
+  s = s.replace(/<strong\b[^>]*>/gi, '**').replace(/<\/strong>/gi, '**');
+  s = s.replace(/<b\b[^>]*>/gi, '**').replace(/<\/b>/gi, '**');
+  // Italique
+  s = s.replace(/<em\b[^>]*>/gi, '*').replace(/<\/em>/gi, '*');
+  s = s.replace(/<i\b[^>]*>/gi, '*').replace(/<\/i>/gi, '*');
+  // Souligné
+  s = s.replace(/<u\b[^>]*>/gi, '__').replace(/<\/u>/gi, '__');
+  // Barré — \b évite de matcher <span>, <section>…
+  s = s.replace(/<s\b[^>]*>/gi, '~~').replace(/<\/s>/gi, '~~');
+  s = s.replace(/<del\b[^>]*>/gi, '~~').replace(/<\/del>/gi, '~~');
+  s = s.replace(/<strike\b[^>]*>/gi, '~~').replace(/<\/strike>/gi, '~~');
+  // Liens
+  s = s.replace(/<a\b[^>]+href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)');
+  // Supprime les balises restantes
+  s = s.replace(/<[^>]+>/g, '');
+  // Décode les entités HTML
+  s = s.replace(/&nbsp;/gi, ' ')
+       .replace(/&amp;/gi, '&')
+       .replace(/&lt;/gi, '<')
+       .replace(/&gt;/gi, '>')
+       .replace(/&quot;/gi, '"')
+       .replace(/&#39;/gi, "'")
+       .replace(/&apos;/gi, "'")
+       .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
+  // Nettoyage
+  s = s.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return s;
+}
+
+function _extractImageUrls(html) {
+  const urls = [];
+  const re = /<img\b[^>]+src="(https?:\/\/[^"]+)"[^>]*>/gi;
+  let m;
+  while ((m = re.exec(html || '')) !== null) urls.push(m[1]);
+  return urls;
+}
+
 async function _sendDiscordBlog(blogId, btn) {
   const item = getData(KEYS.blog).find(b => b.id === blogId);
   if (!item) return;
@@ -1427,7 +1581,8 @@ async function _sendDiscordBlog(blogId, btn) {
         title:    item.title,
         category: item.category,
         author:   item.author,
-        excerpt:  (item.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000),
+        excerpt:  _htmlToDiscordMd(item.content || '').slice(0, 4000),
+        imageUrls: _extractImageUrls(item.content || ''),
         siteUrl:  `${location.origin}${location.pathname.replace('admin.html', '')}index.html#blog`
       })
     });
@@ -1449,7 +1604,8 @@ function populateBlogForm(item) {
   const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val || ''; };
   set('title',    item.title);
   set('category', item.category);
-  set('author',   item.author);
+  const authorHidden = document.getElementById('blog-author-value');
+  if (authorHidden) { authorHidden.value = item.author || ''; populateAuthorSelect(); }
   const submitBtn = form.querySelector('button[type="submit"]');
   submitBtn.innerHTML = '&#9998; Modifier l\'article';
   if (!form.querySelector('.btn-cancel-edit')) {
@@ -1469,6 +1625,8 @@ function cancelBlogEdit() {
   _blogSnap = null;
   const form = document.getElementById('form-blog');
   form.reset();
+  const authorHidden = document.getElementById('blog-author-value');
+  if (authorHidden) { authorHidden.value = ''; populateAuthorSelect(); }
   form.querySelector('button[type="submit"]').innerHTML = "&#9998; Créer l'article";
   const cancelBtn = form.querySelector('.btn-cancel-edit');
   if (cancelBtn) cancelBtn.remove();
@@ -1925,9 +2083,11 @@ function logNotification(type, message, details = [], anchor = '', eventId = nul
 }
 
 /* ─── Confirm modal ──────────────────────────────────────────────── */
-function showConfirm(message, onConfirm) {
+function showConfirm(message, onConfirm, { labelYes = 'Oui', labelNo = 'Non' } = {}) {
   const overlay = document.getElementById('confirm-overlay');
   document.getElementById('confirm-msg').textContent = message;
+  document.getElementById('confirm-yes').textContent = labelYes;
+  document.getElementById('confirm-no').textContent  = labelNo;
   overlay.removeAttribute('hidden');
 
   const yes = document.getElementById('confirm-yes');
@@ -2107,4 +2267,222 @@ function showToast(msg, isError = false) {
   toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AGENDA
+═══════════════════════════════════════════════════════════════════ */
+const AGENDA_PRESET_TITLES = ['Gros-jeu Ludoried', 'Réunion bureau'];
+const AGENDA_COLORS = {
+  'evenement':         '#e8a020',
+  'Gros-jeu Ludoried': '#7c3aed',
+  'Réunion bureau':    '#0891b2',
+  '__autre__':         '#15803d'
+};
+const AGENDA_MONTH_NUM = { 'Jan':'01','Fév':'02','Mar':'03','Avr':'04','Mai':'05','Jun':'06','Jul':'07','Aoû':'08','Sep':'09','Oct':'10','Nov':'11','Déc':'12' };
+const AGENDA_MONTH_ABR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+function _agendaTimeLabel(item) {
+  const dH = parseInt(item.durationH || 0, 10);
+  const dM = parseInt(item.durationM || 0, 10);
+  if (!item.timeStart) return (dH || dM) ? `Durée : ${dH}h${String(dM).padStart(2, '0')}` : '';
+  const startFmt = item.timeStart.replace(':', 'h');
+  if (!dH && !dM) return startFmt;
+  const [h, m] = item.timeStart.split(':').map(Number);
+  const totalMin = h * 60 + m + dH * 60 + dM;
+  const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+  const endM = String(totalMin % 60).padStart(2, '0');
+  return `${startFmt} – ${endH}h${endM}`;
+}
+
+function renderAgenda() {
+  const items = getData(KEYS.agenda).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const list  = document.getElementById('list-agenda');
+  const count = document.getElementById('count-agenda');
+  if (!list) return;
+  count.textContent = items.length;
+
+  if (!items.length) {
+    list.innerHTML = '<p class="empty-msg">Aucune entrée d\'agenda.</p>';
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
+    const timeLabel = _agendaTimeLabel(item);
+    return `
+    <div class="admin-list-item">
+      <div class="admin-item-header" style="display:flex;align-items:center;gap:.5rem;">
+        <span style="width:12px;height:12px;border-radius:50%;background:${esc(item.color || '#7c3aed')};flex-shrink:0;display:inline-block;"></span>
+        <h4 class="admin-item-title">${esc(item.title)}</h4>
+      </div>
+      <div class="admin-item-meta">
+        &#128197; ${esc(item.date || '')}
+        ${timeLabel ? '&nbsp;·&nbsp;&#128336; ' + esc(timeLabel) : ''}
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn-edit" data-edit="${esc(item.id)}">&#9998; Modifier</button>
+        <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.agenda}">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  bindDeleteButtons(list, KEYS.agenda, renderAgenda, null, 'title');
+
+  list.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = getData(KEYS.agenda).find(i => i.id === btn.dataset.edit);
+      if (item) populateAgendaForm(item);
+    });
+  });
+}
+
+function _applyAgendaTitleUI(titleValue) {
+  const timeGroup   = document.getElementById('agenda-time-group');
+  const timeLabel   = document.getElementById('agenda-time-label');
+  const timeInput   = document.querySelector('#form-agenda [name="timeStart"]');
+  if (!timeGroup) return;
+
+  if (titleValue === 'Gros-jeu Ludoried') {
+    timeGroup.style.display = 'none';
+    if (timeInput) timeInput.required = false;
+  } else if (titleValue === 'Réunion bureau') {
+    timeGroup.style.display = '';
+    if (timeLabel) timeLabel.textContent = 'Heure de début *';
+    if (timeInput) timeInput.required = true;
+  } else {
+    timeGroup.style.display = '';
+    if (timeLabel) timeLabel.textContent = 'Heure de début';
+    if (timeInput) timeInput.required = false;
+  }
+}
+
+function _bindAgendaTitleSelect() {
+  const sel    = document.getElementById('agenda-title-select');
+  const custom = document.getElementById('agenda-title-custom');
+  const hidden = document.getElementById('agenda-title-value');
+  if (!sel) return;
+
+  sel.addEventListener('change', () => {
+    if (sel.value === '__autre__') {
+      custom.style.display = 'block';
+      hidden.value = custom.value.trim();
+    } else {
+      custom.style.display = 'none';
+      hidden.value = sel.value;
+    }
+    _applyAgendaTitleUI(sel.value);
+  });
+
+  custom.addEventListener('input', () => { hidden.value = custom.value.trim(); });
+
+  _applyAgendaTitleUI(sel.value);
+}
+
+function bindAgendaForm() {
+  const form = document.getElementById('form-agenda');
+  if (!form) return;
+
+  _bindAgendaTitleSelect();
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const data   = collectForm(e.target);
+    const title  = document.getElementById('agenda-title-value').value.trim();
+    const day    = String(parseInt(data.agendaDay || 0, 10)).padStart(2, '0');
+    const mon    = AGENDA_MONTH_NUM[data.agendaMonth] || '';
+    const year   = data.agendaYear || '';
+    if (!title || !day || day === '00' || !mon || !year) {
+      showToast('Titre, jour, mois et année sont obligatoires.', true);
+      return;
+    }
+    if (title === 'Réunion bureau' && !data.timeStart) {
+      showToast('L\'heure de début est obligatoire pour une Réunion bureau.', true);
+      return;
+    }
+    const isoDate = `${year}-${mon}-${day}`;
+
+    const fields = {
+      title,
+      date:      isoDate,
+      timeStart: data.timeStart || '',
+      durationH: parseInt(data.durationH || 0, 10),
+      durationM: parseInt(data.durationM || 0, 10),
+      color:     AGENDA_COLORS[title] || AGENDA_COLORS['__autre__']
+    };
+
+    if (editingAgendaId) {
+      const items = getData(KEYS.agenda).map(i => i.id === editingAgendaId ? { ...i, ...fields } : i);
+      saveData(KEYS.agenda, items);
+      cancelAgendaEdit();
+      showToast('Entrée modifiée !');
+    } else {
+      prepend(KEYS.agenda, { id: genId('agenda'), ...fields });
+      _resetAgendaForm(e.target);
+      showToast('Entrée ajoutée !');
+    }
+    renderAgenda();
+  });
+}
+
+function _resetAgendaForm(form) {
+  form.reset();
+  document.getElementById('agenda-title-select').value = 'Gros-jeu Ludoried';
+  document.getElementById('agenda-title-custom').style.display = 'none';
+  document.getElementById('agenda-title-value').value = 'Gros-jeu Ludoried';
+  form.querySelector('[name="durationH"]').value = '2';
+  form.querySelector('[name="durationM"]').value = '0';
+  _applyAgendaTitleUI('Gros-jeu Ludoried');
+}
+
+function populateAgendaForm(item) {
+  editingAgendaId = item.id;
+  const form = document.getElementById('form-agenda');
+  const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val ?? ''; };
+
+  const sel    = document.getElementById('agenda-title-select');
+  const custom = document.getElementById('agenda-title-custom');
+  const hidden = document.getElementById('agenda-title-value');
+  hidden.value = item.title || '';
+  if (AGENDA_PRESET_TITLES.includes(item.title)) {
+    sel.value = item.title;
+    custom.style.display = 'none';
+    _applyAgendaTitleUI(item.title);
+  } else {
+    sel.value = '__autre__';
+    custom.style.display = 'block';
+    custom.value = item.title || '';
+    _applyAgendaTitleUI('__autre__');
+  }
+
+  if (item.date) {
+    const [y, m, d] = item.date.split('-');
+    set('agendaDay',   String(parseInt(d, 10)));
+    set('agendaMonth', AGENDA_MONTH_ABR[parseInt(m, 10) - 1] || '');
+    set('agendaYear',  y);
+  }
+  set('timeStart', item.timeStart || '');
+  set('durationH', item.durationH ?? 2);
+  set('durationM', item.durationM ?? 0);
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.textContent = 'Enregistrer les modifications';
+  if (!form.querySelector('.btn-cancel-edit')) {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn btn-outline-sm btn-full btn-cancel-edit';
+    cancelBtn.textContent = 'Annuler la modification';
+    cancelBtn.style.marginTop = '0.5rem';
+    cancelBtn.addEventListener('click', cancelAgendaEdit);
+    submitBtn.after(cancelBtn);
+  }
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelAgendaEdit() {
+  editingAgendaId = null;
+  const form = document.getElementById('form-agenda');
+  _resetAgendaForm(form);
+  form.querySelector('button[type="submit"]').textContent = '+ Ajouter l\'entrée';
+  const cancelBtn = form.querySelector('.btn-cancel-edit');
+  if (cancelBtn) cancelBtn.remove();
 }

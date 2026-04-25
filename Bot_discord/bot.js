@@ -216,7 +216,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 /* ── Démarrage ────────────────────────────────────────────────────── */
-client.once('ready', () => {
+client.once('clientReady', () => {
   console.log(`✓  Bot Discord connecté : ${client.user.tag}`);
   server.listen(BOT_PORT, '127.0.0.1', () => {
     console.log(`✓  Serveur interne → http://127.0.0.1:${BOT_PORT}`);

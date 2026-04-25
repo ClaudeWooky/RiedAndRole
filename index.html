@@ -44,6 +44,7 @@
             <li><a href="#home"         class="nav-link active" data-target="home">Home</a></li>
             <li><a href="#jeux"         class="nav-link" data-target="jeux">Jeux de Rôles</a></li>
             <li><a href="#evenements"   class="nav-link" data-target="evenements">Événements</a></li>
+            <li><a href="#agenda"       class="nav-link" data-target="agenda">Agenda</a></li>
             <li><a href="#blog"         class="nav-link" data-target="blog">Blog</a></li>
             <li><a href="#equipe"       class="nav-link" data-target="equipe">L'Équipe</a></li>
             <li><a href="#contacts"     class="nav-link" data-target="contacts">Contacts</a></li>
@@ -324,6 +325,22 @@
           <h3 class="sub-section-title" id="past-events-title" hidden>Événements passés</h3>
           <div class="events-timeline events-timeline--past" id="past-events"></div>
 
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════  AGENDA  ══════════════════════════ -->
+    <section id="agenda" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#080c14 0%,#0a1628 50%,#080c14 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Planning</p>
+          <h1>Notre <span class="accent">Agenda</span></h1>
+          <p>Tous nos événements et rendez-vous à venir</p>
+        </div>
+      </div>
+      <div class="section-wrap">
+        <div class="container">
+          <div id="agenda-calendar" class="cal-wrapper"></div>
         </div>
       </div>
     </section>
@@ -625,6 +642,7 @@
               <li><a href="#home" class="nav-link" data-target="home">Home</a></li>
               <li><a href="#jeux" class="nav-link" data-target="jeux">Jeux de Rôles</a></li>
               <li><a href="#evenements" class="nav-link" data-target="evenements">Événements</a></li>
+              <li><a href="#agenda" class="nav-link" data-target="agenda">Agenda</a></li>
               <li><a href="#blog" class="nav-link" data-target="blog">Blog</a></li>
               <li><a href="#equipe" class="nav-link" data-target="equipe">L'Équipe</a></li>
               <li><a href="#contacts" class="nav-link" data-target="contacts">Contacts</a></li>
@@ -740,6 +758,19 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL AGENDA ENTRY  ══════════════ -->
+  <div id="agenda-entry-overlay" class="modal-overlay" hidden>
+    <div class="modal-card agenda-entry-card">
+      <button type="button" id="agenda-entry-close" class="agenda-entry-close">&#10005;</button>
+      <div id="agenda-entry-color-bar" class="agenda-entry-color-bar"></div>
+      <h3 id="agenda-entry-title" class="modal-title" style="margin-top:.9rem;font-size:1.15rem;"></h3>
+      <p id="agenda-entry-date"     class="agenda-entry-meta"></p>
+      <p id="agenda-entry-time"     class="agenda-entry-meta agenda-entry-time" hidden></p>
+      <p id="agenda-entry-location" class="agenda-entry-meta agenda-entry-location" hidden></p>
+      <div id="agenda-entry-desc"   class="agenda-entry-desc" hidden></div>
     </div>
   </div>
 

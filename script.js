@@ -14,19 +14,20 @@ function escHtml(str) {
 const FR_MONTHS = { Jan:0, 'Fév':1, Mar:2, Avr:3, Mai:4, Jun:5, Jul:6, 'Aoû':7, Sep:8, Oct:9, Nov:10, 'Déc':11 };
 
 /* ─── In-memory data store (populated by loadAllData) ────────────── */
-const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [] };
+const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [] };
 
-const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions' };
+const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda' };
 
 const BLOG_CATS = {
   'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)', image: '/assets/blog/annonce.png' },
   'critique':       { label: 'Critique de jeu',        color: 'purple', icon: '🎮', gradient: 'linear-gradient(135deg,#1a0a2e,#4b1c7d)', image: '/assets/blog/critique.png' },
   'evenement':      { label: 'Événement',              color: 'red',    icon: '🎉', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)', image: '/assets/blog/evenement.png' },
-  'conseil-mj':     { label: 'Conseil MJ',             color: 'orange', icon: '📜', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
-  'conseil-joueur': { label: 'Conseil Joueur',         color: 'green',  icon: '🎲', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)' },
+  'conseil-mj':     { label: 'Conseil MJ',             color: 'orange', icon: '📜', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)', image: '/assets/blog/MJ.png' },
+  'conseil-joueur': { label: 'Conseil Joueur',         color: 'green',  icon: '🎲', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)', image: '/assets/blog/PJ.png' },
   'photos':         { label: 'Photos',                 color: 'teal',   icon: '📷', gradient: 'linear-gradient(135deg,#001014,#002535)' },
   'vie-asso':       { label: "Vie de l'asso",          color: 'pink',   icon: '🏠', gradient: 'linear-gradient(135deg,#1a0514,#5c0d3a)' },
   'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
+  'culture-geek':   { label: 'Culture Geek',           color: 'cyan',   icon: '🤓', gradient: 'linear-gradient(135deg,#001a1a,#004d4d)' },
 };
 
 function formatBlogDate(isoDate) {
@@ -51,6 +52,9 @@ async function loadAllData() {
 /* ══════════════════════════════════════════════════════════════════
    DYNAMIC CONTENT — loaded from data/ files (via server)
 ══════════════════════════════════════════════════════════════════ */
+let _calYear  = new Date().getFullYear();
+let _calMonth = new Date().getMonth();
+
 (async function loadDynamicContent() {
   await loadAllData();
   loadDynamicEvents();
@@ -59,6 +63,7 @@ async function loadAllData() {
   loadDynamicTeam();
   loadDynamicBlog();
   loadHomeBlog();
+  loadDynamicAgenda();
   await applyStatConfig();
   initNotifWidget();
   _initBlogArticleModal();
@@ -1084,3 +1089,231 @@ function initNotifWidget() {
     msgEl.hidden = false;
   }
 })();
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   AGENDA — Calendrier
+═══════════════════════════════════════════════════════════════════ */
+const CAL_MONTHS_LONG = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const CAL_DAYS_SHORT  = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const CAL_AGENDA_COLORS = {
+  'Gros-jeu Ludoried': '#7c3aed',
+  'Réunion bureau':    '#0891b2'
+};
+const CAL_AGENDA_COLOR_DEFAULT = '#15803d';
+
+let _calEntries = [];
+
+function _fmtISODate(ds) {
+  if (!ds) return '';
+  const [y, m, d] = ds.split('-').map(Number);
+  return `${d} ${CAL_MONTHS_LONG[m - 1]} ${y}`;
+}
+
+function _fmtEventDate(ev) {
+  const sD = ev.startDay || ev.day || '';
+  const sM = ev.startMonth || ev.month || '';
+  const sY = ev.startYear  || ev.year  || '';
+  const eD = ev.endDay || '';
+  const eM = ev.endMonth || '';
+  const eY = ev.endYear  || '';
+  if (eD && eM && eY && (eD !== sD || eM !== sM || eY !== sY)) {
+    if (eM === sM && eY === sY) return `${sD} – ${eD} ${sM} ${sY}`;
+    return `${sD} ${sM} ${sY} – ${eD} ${eM} ${eY}`;
+  }
+  return `${sD} ${sM} ${sY}`;
+}
+
+function loadDynamicAgenda() {
+  const container = document.getElementById('agenda-calendar');
+  if (!container) return;
+  renderCalendar(container);
+  _initAgendaEntryModal();
+}
+
+function buildCalendarDayMap(year, month) {
+  const map = {};
+  const add = (ds, entry) => { (map[ds] = map[ds] || []).push(entry); };
+  const monthStart = new Date(year, month, 1);
+  const monthEnd   = new Date(year, month + 1, 0);
+
+  (_data.events || []).forEach(ev => {
+    const start = eventToDate(ev);
+    if (!start) return;
+    const end = eventEffectiveEndDate(ev) || start;
+    if (start > monthEnd || end < monthStart) return;
+    const from = start < monthStart ? new Date(monthStart) : new Date(start);
+    const to   = end   > monthEnd   ? new Date(monthEnd)   : new Date(end);
+    const timeLabel = [ev.startTimeFrom, ev.startTimeTo].filter(Boolean).join(' – ');
+    const d = new Date(from);
+    while (d <= to) {
+      add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, {
+        title:       ev.title,
+        color:       '#e8a020',
+        type:        'event',
+        dateLabel:   _fmtEventDate(ev),
+        timeLabel,
+        description: ev.description || '',
+        location:    ev.location    || ''
+      });
+      d.setDate(d.getDate() + 1);
+    }
+  });
+
+  (_data.agenda || []).forEach(ag => {
+    if (!ag.date) return;
+    const [ay, am, ad] = ag.date.split('-').map(Number);
+    const start = new Date(ay, am - 1, ad);
+    if (start > monthEnd || start < monthStart) return;
+    const dateLabel = _fmtISODate(ag.date);
+    const _dH = parseInt(ag.durationH || 0, 10);
+    const _dM = parseInt(ag.durationM || 0, 10);
+    let timeLabel = '';
+    if (ag.timeStart) {
+      const startFmt = ag.timeStart.replace(':', 'h');
+      if (_dH || _dM) {
+        const [h, m] = ag.timeStart.split(':').map(Number);
+        const totalMin = h * 60 + m + _dH * 60 + _dM;
+        const eH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+        const eM = String(totalMin % 60).padStart(2, '0');
+        timeLabel = `${startFmt} – ${eH}h${eM}`;
+      } else {
+        timeLabel = startFmt;
+      }
+    } else if (_dH || _dM) {
+      timeLabel = `Durée : ${_dH}h${String(_dM).padStart(2, '0')}`;
+    }
+    const d = new Date(start);
+    {
+      add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, {
+        title:       ag.title,
+        color:       CAL_AGENDA_COLORS[ag.title] || ag.color || CAL_AGENDA_COLOR_DEFAULT,
+        type:        'agenda',
+        dateLabel,
+        timeLabel,
+        description: ag.description || '',
+        location:    ''
+      });
+    }
+  });
+
+  return map;
+}
+
+function renderCalendar(container) {
+  _calEntries = [];
+  const year   = _calYear;
+  const month  = _calMonth;
+  const dayMap = buildCalendarDayMap(year, month);
+  const firstDow  = new Date(year, month, 1).getDay();
+  const offset    = (firstDow + 6) % 7;
+  const daysInMth = new Date(year, month + 1, 0).getDate();
+  const today     = new Date();
+  const todayStr  = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  const headers = CAL_DAYS_SHORT.map(d => `<div class="cal-day-header">${d}</div>`).join('');
+  let cells = '<div class="cal-cell cal-cell-empty"></div>'.repeat(offset);
+
+  for (let d = 1; d <= daysInMth; d++) {
+    const ds      = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const entries = dayMap[ds] || [];
+    const isToday = ds === todayStr;
+    const isPast  = ds < todayStr;
+
+    const chips = entries.slice(0, 3).map(e => {
+      const idx = _calEntries.length;
+      _calEntries.push(e);
+      return `<span class="cal-chip" data-cal-idx="${idx}" style="background:${e.color}22;border-color:${e.color};color:${e.color}">${escHtml(e.title)}</span>`;
+    }).join('');
+
+    const moreEntries = entries.slice(3);
+    let more = '';
+    if (moreEntries.length) {
+      const firstIdx = _calEntries.length;
+      moreEntries.forEach(e => _calEntries.push(e));
+      more = `<span class="cal-chip-more" data-cal-idx="${firstIdx}" style="cursor:pointer" title="Voir plus">+${moreEntries.length}</span>`;
+    }
+
+    cells += `<div class="cal-cell${isToday ? ' cal-today' : ''}${isPast ? ' cal-past' : ''}"><span class="cal-day-num">${d}</span><div class="cal-chips">${chips}${more}</div></div>`;
+  }
+
+  const tail = (offset + daysInMth) % 7 === 0 ? 0 : 7 - ((offset + daysInMth) % 7);
+  cells += '<div class="cal-cell cal-cell-empty"></div>'.repeat(tail);
+
+  container.innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav" id="cal-prev">&#8249;</button>
+      <span class="cal-month-label">${CAL_MONTHS_LONG[month]} ${year}</span>
+      <button class="cal-nav" id="cal-next">&#8250;</button>
+    </div>
+    <div class="cal-grid">${headers}${cells}</div>
+    <div class="cal-legend">
+      <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#e8a020"></span>Événements</span>
+      <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#7c3aed"></span>Gros-jeu Ludoried</span>
+      <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#0891b2"></span>Réunion bureau</span>
+      <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#15803d"></span>Autre</span>
+    </div>`;
+
+  container.querySelectorAll('[data-cal-idx]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const entry = _calEntries[parseInt(chip.dataset.calIdx, 10)];
+      if (entry) openAgendaEntry(entry);
+    });
+  });
+
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    _calMonth--; if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+    renderCalendar(container);
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    _calMonth++; if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+    renderCalendar(container);
+  });
+}
+
+function openAgendaEntry(entry) {
+  const overlay  = document.getElementById('agenda-entry-overlay');
+  const colorBar = document.getElementById('agenda-entry-color-bar');
+  const titleEl  = document.getElementById('agenda-entry-title');
+  const dateEl   = document.getElementById('agenda-entry-date');
+  const timeEl   = document.getElementById('agenda-entry-time');
+  const locEl    = document.getElementById('agenda-entry-location');
+  const descEl   = document.getElementById('agenda-entry-desc');
+
+  colorBar.style.background = entry.color;
+  titleEl.textContent = entry.title;
+  dateEl.textContent  = entry.dateLabel;
+
+  if (entry.timeLabel) {
+    timeEl.textContent = entry.timeLabel;
+    timeEl.hidden = false;
+  } else {
+    timeEl.hidden = true;
+  }
+
+  if (entry.location) {
+    locEl.textContent = entry.location;
+    locEl.hidden = false;
+  } else {
+    locEl.hidden = true;
+  }
+
+  if (entry.description) {
+    descEl.textContent = entry.description;
+    descEl.hidden = false;
+  } else {
+    descEl.hidden = true;
+  }
+
+  overlay.removeAttribute('hidden');
+}
+
+function _initAgendaEntryModal() {
+  const overlay = document.getElementById('agenda-entry-overlay');
+  if (!overlay || overlay.dataset.bound) return;
+  overlay.dataset.bound = '1';
+  const close = () => overlay.setAttribute('hidden', '');
+  document.getElementById('agenda-entry-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) close(); });
+}

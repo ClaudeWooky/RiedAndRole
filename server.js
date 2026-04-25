@@ -43,35 +43,149 @@ function discordGuildId()  { return process.env.DISCORD_GUILD_ID  || _cfg.discor
 
 function isEmailConfigured()   { return !!(sgKey() || (nodemailer && smtpHost())); }
 function isDiscordConfigured() { return !!(discordBotToken() && discordGuildId()); }
+/* Lire Bot_discord/config.json — ses valeurs ont la priorité pour le bot */
+let _botCfg = {};
+try {
+  _botCfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'Bot_discord', 'config.json'), 'utf8'));
+} catch {}
 
-function botWebhookUrl()    { return process.env.BOT_WEBHOOK_URL    || _cfg.botWebhookUrl    || ''; }
-function botWebhookSecret() { return process.env.BOT_WEBHOOK_SECRET || _cfg.botWebhookSecret || ''; }
-function isBotConfigured()  { return !!(botWebhookUrl() && botWebhookSecret()); }
+function _botToken()    { return _botCfg.token    || process.env.DISCORD_BOT_TOKEN || _cfg.discordBotToken || ''; }
+function _botGuildId()  { return _botCfg.guildId  || discordGuildId(); }
+function discordChannels() { return _botCfg.channels || _cfg.discordChannels || {}; }
 
-async function callBot(endpoint, data) {
-  const url     = new URL(endpoint, botWebhookUrl());
-  const payload = JSON.stringify(data);
-  const mod     = url.protocol === 'https:' ? https : http;
-  return new Promise((resolve, reject) => {
-    const req = mod.request({
-      hostname: url.hostname,
-      port:     url.port || (url.protocol === 'https:' ? 443 : 80),
-      path:     url.pathname,
-      method:   'POST',
-      headers:  {
-        'x-bot-secret':   botWebhookSecret(),
-        'Content-Type':   'application/json',
-        'Content-Length': Buffer.byteLength(payload)
-      }
-    }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => resolve({ status: res.statusCode, body: d }));
-    });
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
+/* ── Bot Discord intégré (discord.js optionnel) ──────────────────── */
+let _discord      = null; // { client, REST, Routes, EmbedBuilder } après require
+let _discordReady = false;
+
+function _isBotReady() { return _discordReady && !!_discord; }
+
+async function _fetchDiscordChannel(topic, sub = null) {
+  if (!_discord) return null;
+  const section = discordChannels()[topic];
+  if (!section) return null;
+  const ids = [];
+  if (typeof section === 'object' && !Array.isArray(section)) {
+    if (sub && section[sub]) ids.push(section[sub]);
+    if (section.default && section.default !== section[sub]) ids.push(section.default);
+  } else {
+    ids.push(section);
+  }
+  for (const id of ids) {
+    try {
+      const ch = await _discord.client.channels.fetch(id);
+      if (ch?.isTextBased() || ch?.type === 15) return ch;
+      if (ch) console.warn(`[bot] Canal ${id} non textuel (type: ${ch.type})`);
+    } catch (err) {
+      console.warn(`[bot] Canal ${id} inaccessible : ${err.message}`);
+    }
+  }
+  return null;
+}
+
+const _BOT_COLOR = 0xe8a020;
+const _BOT_ICONS = {
+  event_added:'📅', event_modified:'📅', event_deleted:'🗑️',
+  table_added:'🪑', table_cancelled:'❌', table_reactivated:'✅',
+  game_added:'🎲',  game_modified:'🎲',  game_deleted:'🗑️',
+  blog_added:'📝',  blog_modified:'📝',  blog_deleted:'🗑️',
+};
+
+async function botAnnounce(topic, type, title, details, url) {
+  if (!_isBotReady()) throw new Error('Bot non connecté');
+  const ch = await _fetchDiscordChannel(topic);
+  if (!ch) throw new Error(`Salon "${topic}" non configuré dans discordChannels`);
+  const embed = new _discord.EmbedBuilder()
+    .setTitle(`${_BOT_ICONS[type] || '🔔'} ${String(title || 'Notification').slice(0, 256)}`)
+    .setColor(_BOT_COLOR).setTimestamp();
+  if (url) embed.setURL(url);
+  if (Array.isArray(details) && details.length)
+    embed.setDescription(details.map(d => `• ${d}`).join('\n').slice(0, 4096));
+  if (ch.type === 15) {
+    const thread = await ch.threads.create({ name: String(title || 'Notification').slice(0, 100), message: { embeds: [embed] } });
+    console.log(`[bot] Annonce dans forum #${ch.name} (fil ${thread.id})`);
+    return { messageId: thread.id };
+  }
+  const msg = await ch.send({ embeds: [embed] });
+  console.log(`[bot] Annonce dans #${ch.name} (topic=${topic})`);
+  return { messageId: msg.id };
+}
+
+async function botBlog(title, category, author, excerpt, imageUrls) {
+  if (!_isBotReady()) throw new Error('Bot non connecté');
+  const ch = await _fetchDiscordChannel('blog', category || null);
+  if (!ch) throw new Error(`Salon blog "${category || 'default'}" non configuré`);
+  const embed = new _discord.EmbedBuilder()
+    .setTitle(String(title).slice(0, 256))
+    .setColor(_BOT_COLOR);
+  if (author)  embed.setAuthor({ name: ('Auteur : ' + String(author)).slice(0, 256) });
+  if (excerpt) embed.setDescription(String(excerpt).slice(0, 4096));
+  const imgs = Array.isArray(imageUrls) ? imageUrls : [];
+  if (ch.type === 15) {
+    const thread = await ch.threads.create({ name: String(title).slice(0, 100), message: { embeds: [embed] } });
+    for (const url of imgs) await thread.send(url);
+    console.log(`[bot] Blog dans forum #${ch.name} (fil ${thread.id}, ${imgs.length} image(s))`);
+    return { messageId: thread.id };
+  }
+  const msg = await ch.send({ embeds: [embed] });
+  for (const url of imgs) await ch.send(url);
+  console.log(`[bot] Blog dans #${ch.name} (cat=${category || 'default'}, ${imgs.length} image(s))`);
+  return { messageId: msg.id };
+}
+
+async function botEventPost(name, dateStr, location, description) {
+  if (!_isBotReady()) throw new Error('Bot non connecté');
+  const ch = await _fetchDiscordChannel('events');
+  if (!ch) throw new Error('Salon "events" non configuré dans discordChannels');
+  const descParts = [`📅 ${dateStr}`, `📍 ${location || 'À définir'}`];
+  if (description) descParts.push('', description);
+  const embed = new _discord.EmbedBuilder()
+    .setTitle(String(name).slice(0, 256))
+    .setColor(_BOT_COLOR)
+    .setDescription(descParts.join('\n').slice(0, 4096));
+  if (ch.type === 15) {
+    const thread = await ch.threads.create({ name: String(name).slice(0, 100), message: { embeds: [embed] } });
+    console.log(`[bot] Événement dans forum #${ch.name} (fil ${thread.id})`);
+    return { messageId: thread.id };
+  }
+  const msg = await ch.send({ embeds: [embed] });
+  console.log(`[bot] Événement dans #${ch.name}`);
+  return { messageId: msg.id };
+}
+
+async function botEvent(name, startIso, endIso, description, location) {
+  if (!_discord) throw new Error('Bot non initialisé');
+  if (new Date(startIso) <= new Date()) throw new Error('Date dans le passé');
+  const rest = new _discord.REST().setToken(_botToken());
+  const payload = {
+    name:                 String(name).slice(0, 100),
+    privacy_level:        2,
+    scheduled_start_time: startIso,
+    scheduled_end_time:   endIso,
+    entity_type:          3,
+    entity_metadata:      { location: String(location || 'Lieu à confirmer').slice(0, 100) },
+  };
+  if (description) payload.description = String(description).slice(0, 1000);
+  const event = await rest.post(_discord.Routes.guildScheduledEvents(_botGuildId()), { body: payload });
+  console.log(`[bot] Événement Discord planifié : "${event.name}" (${event.id})`);
+  return { eventId: event.id, url: `https://discord.com/events/${_botGuildId()}/${event.id}` };
+}
+
+function _initDiscordBot() {
+  const token   = _botToken();
+  const guildId = _botGuildId();
+  if (!token || !guildId) return;
+  let djs;
+  try { djs = require('discord.js'); }
+  catch { console.warn('⚠  discord.js non installé — bot Discord désactivé'); return; }
+  const { Client, REST, Routes, GatewayIntentBits, EmbedBuilder } = djs;
+  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+  _discord = { client, REST, Routes, EmbedBuilder };
+  client.once('clientReady', () => {
+    _discordReady = true;
+    console.log(`✓  Bot Discord connecté : ${client.user.tag}`);
   });
+  client.on('error', err => console.error('[discord.js]', err.message));
+  client.login(token).catch(err => console.error('✗  Connexion Discord échouée :', err.message));
 }
 
 function _parsedFrom() {
@@ -169,7 +283,7 @@ function verifyPw(password, storedHash, salt) {
 
 /* ── Accounts helpers ────────────────────────────────────────────── */
 const ACCOUNTS_FILE = path.join(DATA, 'accounts.json');
-const ALL_PERMS = ['evenements', 'jeux', 'equipe', 'blog', 'site'];
+const ALL_PERMS = ['evenements', 'agenda', 'jeux', 'equipe', 'blog', 'site'];
 
 function loadAccounts() {
   try { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')); }
@@ -493,23 +607,12 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // Poster sur Discord via le bot si configuré
-      if (isBotConfigured()) {
-        // Blog → /bot/blog avec routage par catégorie
-        if (type === 'blog_added' || type === 'blog_modified') {
-          callBot('/bot/blog', {
-            title: message, category: category || null,
-            siteUrl: `${siteUrl}${anchor || ''}`
-          }).catch(err => console.error('[bot-blog]', err.message));
+      // Poster sur Discord via le bot intégré si connecté
+      if (_isBotReady()) {
+        if (type === 'game_added' || type === 'game_modified' || type === 'game_deleted') {
+          botAnnounce('games', type, message, details, `${siteUrl}${anchor || ''}`)
+            .catch(err => console.error('[bot-announce]', err.message));
         }
-        // Jeux → /bot/announce salon games
-        else if (type === 'game_added' || type === 'game_modified' || type === 'game_deleted') {
-          callBot('/bot/announce', {
-            topic: 'games', type, title: message, details,
-            url:   `${siteUrl}${anchor || ''}`
-          }).catch(err => console.error('[bot-announce]', err.message));
-        }
-        // Les événements passent par /api/discord-event → /bot/event (Server Events Discord)
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -551,7 +654,7 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
 
-      if (!isBotConfigured() && !isDiscordConfigured()) {
+      if (!_isBotReady() && !isDiscordConfigured()) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Discord non configuré. Ajoutez les paramètres Discord dans config.json ou les variables d\'environnement.' }));
         return;
@@ -560,43 +663,25 @@ const server = http.createServer(async (req, res) => {
       try {
         const { name, startIso, endIso, description, location } = JSON.parse(await readBody(req));
 
-        // Déléguer au bot si disponible
-        if (isBotConfigured()) {
+        // Utiliser le bot intégré si connecté
+        if (_isBotReady()) {
           let dateStr;
           try {
             dateStr = new Date(startIso).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
           } catch {
             dateStr = startIso;
           }
-          const details = [`📅 ${dateStr}`, `📍 ${location || 'À définir'}`];
-          if (description) details.push(description.slice(0, 200));
 
-          // Action principale : annoncer dans le salon events
-          let announceOk = false;
-          let announceErr = 'Bot indisponible';
-          let announceId;
+          // Créer l'événement serveur Discord (nécessite permission "Gérer les événements")
           try {
-            const r = await callBot('/bot/announce', { topic: 'events', type: 'event_added', title: name, details });
-            let b; try { b = JSON.parse(r.body); } catch { b = { ok: false }; }
-            if (b.ok) { announceOk = true; announceId = b.messageId; }
-            else announceErr = b.error || 'Erreur bot';
-          } catch (err) {
-            announceErr = err.message;
-          }
-
-          if (announceOk) {
-            // Bonus silencieux : créer l'événement planifié Discord
-            callBot('/bot/event', { name, startIso, endIso, description, location })
-              .then(r => { try { const b = JSON.parse(r.body); if (!b.ok) console.warn('[bot-event]', b.error); } catch {} })
-              .catch(err => console.warn('[bot-event]', err.message));
+            const r = await botEvent(name, startIso, endIso, description, location);
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, messageId: announceId }));
-            return;
+            res.end(JSON.stringify({ ok: true, url: r.url }));
+          } catch (err) {
+            console.warn('[bot-event]', err.message);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: err.message }));
           }
-
-          // Annonce échouée → erreur directe sans passer par le fallback Discord
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Erreur bot : ' + announceErr }));
           return;
         }
 
@@ -661,26 +746,19 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
 
-      if (!isBotConfigured()) {
+      if (!_isBotReady()) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Bot Discord non configuré (botWebhookUrl / botWebhookSecret manquants).' }));
+        res.end(JSON.stringify({ ok: false, error: 'Bot Discord non connecté.' }));
         return;
       }
 
       try {
-        const { title, category, author, siteUrl: articleUrl } = JSON.parse(await readBody(req));
+        const { title, category, author, excerpt, imageUrls } = JSON.parse(await readBody(req, 65536));
         if (!title) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'title requis' })); return; }
 
-        const _siteUrl = process.env.RAILWAY_PUBLIC_DOMAIN
-          ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-          : `http://localhost:${PORT}`;
-
-        const result = await callBot('/bot/blog', {
-          title, category: category || null, author: author || null,
-          siteUrl: articleUrl || `${_siteUrl}#blog`
-        });
+        const r = await botBlog(title, category || null, author || null, excerpt || null, Array.isArray(imageUrls) ? imageUrls : []);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(result.body);
+        res.end(JSON.stringify({ ok: true, messageId: r.messageId }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'Erreur bot : ' + err.message }));
@@ -1078,3 +1156,5 @@ server.listen(PORT, '0.0.0.0', () => {
   }
   console.log('   Ctrl+C pour arrêter');
 });
+
+_initDiscordBot();
