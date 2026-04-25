@@ -197,6 +197,8 @@ ul { list-style: none; }
 .form-section-title:first-child { margin-top: 0; }
 .form-section-title small { text-transform: none; font-weight: 400; color: var(--text-muted); letter-spacing: 0; }
 
+hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 0; }
+
 .admin-member-thumb {
   width: 28px;
   height: 28px;

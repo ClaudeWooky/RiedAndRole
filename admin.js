@@ -277,8 +277,7 @@ function bindForms() {
       endTimeFrom:   data.endTimeFrom   || '',
       endTimeTo:     data.endTimeTo     || '',
       title:         data.title,
-      tag:           data.tag || 'Événement',
-      tagColor:      data.tagColor || 'orange',
+      tag:           data.tag || '',
       description:   data.description,
       location:      data.location  || '',
       capacity:      data.capacity  || '',
@@ -409,6 +408,16 @@ if (changes.length) logNotification('event_modified', `L'événement « ${fields
       .toUpperCase()
       .slice(0, 2);
 
+    const _GRADIENTS = [
+      'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
+      'linear-gradient(135deg,#1a0808,#7d1c1c)',
+      'linear-gradient(135deg,#0a1a1a,#1c5c4b)',
+      'linear-gradient(135deg,#0a0a1a,#1c1c5c)',
+      'linear-gradient(135deg,#1a1a0a,#5c4b1c)',
+      'linear-gradient(135deg,#1a0a14,#5c1c4b)',
+      'linear-gradient(135deg,#0a1a0a,#1c5c1c)',
+    ];
+
     if (editingTeamId) {
       const items = getData(KEYS.team).map(m => {
         if (m.id !== editingTeamId) return m;
@@ -418,11 +427,10 @@ if (changes.length) logNotification('event_modified', `L'événement « ${fields
           initials:    initials,
           photo:       currentPhotoData !== null ? currentPhotoData : m.photo || null,
           role:        data.role,
-          roleBadge:   data.roleBadge || data.role.split('&')[0].trim(),
+          roleBadge:   data.role,
           mjStyle:     data.mjStyle || '',
           bio:         data.bio || '',
           games:       getSelectedGames(),
-          gradient:    data.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
           type:        data.type || 'bureau',
           isPresident: data.isPresident === 'on',
           pseudoMJ:    data.type !== 'mj' ? (data.pseudoMJ || '') : ''
@@ -439,11 +447,11 @@ if (changes.length) logNotification('event_modified', `L'événement « ${fields
         initials:    initials,
         photo:       currentPhotoData || null,
         role:        data.role,
-        roleBadge:   data.roleBadge || data.role.split('&')[0].trim(),
+        roleBadge:   data.role,
         mjStyle:     data.mjStyle || '',
         bio:         data.bio || '',
         games:       getSelectedGames(),
-        gradient:    data.gradient || 'linear-gradient(135deg,#1a0a2e,#4b1c7d)',
+        gradient:    _GRADIENTS[Math.floor(Math.random() * _GRADIENTS.length)],
         type:        data.type || 'bureau',
         isPresident: data.isPresident === 'on',
         pseudoMJ:    data.type !== 'mj' ? (data.pseudoMJ || '') : ''
@@ -860,7 +868,7 @@ function renderEvents() {
               — ${esc(item.location || '—')}
             </div>
           <div class="admin-item-badges">
-            <span class="admin-item-badge badge-${esc(item.tagColor)}">${esc(item.tag)}</span>
+            ${item.tag ? `<span class="admin-item-badge badge-slate">${esc(item.tag)}</span>` : ''}
             ${item.featured ? '<span class="admin-item-badge badge-orange">★ Vedette</span>' : ''}
           </div>
         </div>
@@ -1218,7 +1226,6 @@ function populateEventForm(item) {
   set('endTimeTo',     item.endTimeTo   || '');
   set('title',         item.title);
   set('tag',           item.tag);
-  set('tagColor',      item.tagColor);
   set('description',   item.description);
   set('location',      item.location);
   set('capacity',      item.capacity);
@@ -1409,10 +1416,8 @@ function populateTeamForm(item) {
   editingTeamId = item.id;
   const form = document.getElementById('form-team');
   form.querySelector('[name="name"]').value      = item.name || '';
-  form.querySelector('[name="role"]').value      = item.role || '';
-  form.querySelector('[name="roleBadge"]').value = item.roleBadge || '';
-  form.querySelector('[name="bio"]').value       = item.bio || '';
-  form.querySelector('[name="gradient"]').value  = item.gradient || '';
+  form.querySelector('[name="role"]').value = item.role || '';
+  form.querySelector('[name="bio"]').value  = item.bio || '';
   form.querySelector('[name="type"]').value      = item.type || 'bureau';
   form.querySelector('[name="isPresident"]').checked = !!item.isPresident;
   form.querySelector('[name="pseudoMJ"]').value  = item.pseudoMJ || '';

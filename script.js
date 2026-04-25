@@ -283,7 +283,6 @@ function buildFeaturedEventHTML(e) {
       <span class="ehc-year">${escHtml(e.startYear  || e.year  || '')}</span>
     </div>
     <div class="ehc-body">
-      <span class="tag tag-${escHtml(e.tagColor)}">&#9733; ${escHtml(e.tag)}</span>
       <h2>${escHtml(e.title)}</h2>
       <p>${escHtml(e.description)}</p>
       <ul class="event-details">
@@ -315,7 +314,6 @@ function buildTimelineEventHTML(e) {
       <div class="ec-line"></div>
     </div>
     <div class="event-content">
-      <span class="tag tag-${escHtml(e.tagColor)}">${escHtml(e.tag)}</span>
       <h4>${escHtml(e.title)}</h4>
       <p>${escHtml(e.description)}</p>
       <div class="event-meta">

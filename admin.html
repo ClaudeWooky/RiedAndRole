@@ -165,26 +165,16 @@
                 </div>
               </div>
 
+              <hr class="form-sep">
+
               <div class="form-group">
                 <label>Titre *</label>
                 <input type="text" name="title" placeholder="-" required />
               </div>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Étiquette</label>
-                  <input type="text" name="tag" placeholder="-" />
-                </div>
-                <div class="form-group">
-                  <label>Couleur</label>
-                  <select name="tagColor">
-                    <option value="orange">Orange</option>
-                    <option value="purple">Violet</option>
-                    <option value="red">Rouge</option>
-                    <option value="green">Vert</option>
-                    <option value="blue">Bleu</option>
-                  </select>
-                </div>
+              <div class="form-group">
+                <label>Étiquette</label>
+                <input type="text" name="tag" placeholder="-" />
               </div>
 
               <div class="form-group">
@@ -352,14 +342,10 @@
                 </div>
               </div>
 
-              <div class="form-row" id="role-badge-group">
+              <div id="role-badge-group">
                 <div class="form-group">
                   <label>Rôle / Titre *</label>
-                  <input type="text" id="role-input" name="role" placeholder="Président &amp; Maître de Jeu" required />
-                </div>
-                <div class="form-group">
-                  <label>Badge(s) <small>(séparés par des virgules)</small></label>
-                  <input type="text" name="roleBadge" placeholder="Président, Maître de Jeu" />
+                  <input type="text" id="role-input" name="role" placeholder="Président, Maître de Jeu" required />
                 </div>
               </div>
 
@@ -374,18 +360,6 @@
                 <select id="games-select" multiple size="5"></select>
               </div>
 
-              <div class="form-group">
-                <label>Couleur de l'avatar</label>
-                <select name="gradient">
-                  <option value="linear-gradient(135deg,#1a0a2e,#4b1c7d)">Violet sombre</option>
-                  <option value="linear-gradient(135deg,#1a0808,#7d1c1c)">Rouge sombre</option>
-                  <option value="linear-gradient(135deg,#0a1a1a,#1c5c4b)">Vert sombre</option>
-                  <option value="linear-gradient(135deg,#0a0a1a,#1c1c5c)">Bleu sombre</option>
-                  <option value="linear-gradient(135deg,#1a1a0a,#5c4b1c)">Or sombre</option>
-                  <option value="linear-gradient(135deg,#1a0a14,#5c1c4b)">Mauve sombre</option>
-                  <option value="linear-gradient(135deg,#0a1a0a,#1c5c1c)">Vert forêt</option>
-                </select>
-              </div>
 
               <div class="form-group" id="pseudo-mj-group">
                 <label>Pseudo MJ <small>(optionnel)</small></label>
