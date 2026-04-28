@@ -747,7 +747,7 @@ const server = http.createServer(async (req, res) => {
     // ── POST /api/discord-blog ────────────────────────────────────
     if (pathname === '/api/discord-blog' && req.method === 'POST') {
       const session = getSession(req);
-      if (!session) { res.writeHead(403); res.end('Forbidden'); return; }
+      if (!session) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'Session expirée, veuillez vous reconnecter.' })); return; }
 
       if (!_isBotReady()) {
         res.writeHead(400, { 'Content-Type': 'application/json' });

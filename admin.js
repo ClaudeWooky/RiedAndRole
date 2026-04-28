@@ -1711,11 +1711,12 @@ async function _sendDiscordBlog(blogId, btn) {
         siteUrl:  `${location.origin}${location.pathname.replace('admin.html', '')}index.html#blog`
       })
     });
+    if (res.status === 401) { showToast('Session expirée, veuillez vous reconnecter.', true); return; }
     const data = await res.json();
     if (data.ok) showToast('Article posté sur Discord !');
     else showToast('Erreur Discord : ' + (data.error || 'inconnue'), true);
-  } catch {
-    showToast('Erreur réseau.', true);
+  } catch (e) {
+    showToast('Erreur réseau : ' + (e?.message || 'inconnue'), true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '&#128762; Discord';
