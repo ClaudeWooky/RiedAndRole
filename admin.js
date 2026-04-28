@@ -552,6 +552,8 @@ function _initQuill() {
         node.setAttribute('data-src', value);
         const img = document.createElement('img');
         img.src = value;
+        img.style.width = '1em';
+        img.style.height = '1em';
         img.style.verticalAlign = 'middle';
         node.appendChild(img);
         return node;
@@ -623,10 +625,10 @@ function _initQuillImageResize(quill) {
     bar.id = 'ql-img-resize-bar';
     bar.innerHTML = `
       <span class="ql-resize-label">Largeur :</span>
-      <button data-w="25">25%</button>
-      <button data-w="33">33%</button>
-      <button data-w="50">50%</button>
-      <button data-w="75">75%</button>
+      <button data-w="1">1%</button>
+      <button data-w="2">2%</button>
+      <button data-w="3">3%</button>
+      <button data-w="5">5%</button>
       <button data-w="100">100%</button>
       <span class="ql-resize-sep"></span>
       <button data-align="left" title="Aligner à gauche">◀</button>
@@ -881,16 +883,16 @@ function _insertSvgIntoEditor(name) {
 
   // Blot inline : pas de saut de ligne contrairement à 'image' (BlockEmbed)
   _quill.insertEmbed(idx, 'svg-image', url);
-  _quill.setSelection(idx + 1);
 
-  setTimeout(() => {
-    const spans = _quill.root.querySelectorAll(`.ql-svg-inline[data-src="${CSS.escape(url)}"]`);
-    const img = spans[spans.length - 1]?.querySelector('img');
-    if (img) {
-      img.style.width  = fontSize;
-      img.style.height = fontSize;
-    }
-  }, 0);
+  // Accès direct au blot inséré via sa position (évite le querySelectorAll qui cible le mauvais élément si le même SVG existe déjà dans l'article)
+  const [blot] = _quill.getLeaf(idx);
+  const img = blot?.domNode?.querySelector('img');
+  if (img) {
+    img.style.width  = fontSize;
+    img.style.height = fontSize;
+  }
+
+  _quill.setSelection(idx + 1);
 }
 
 function _getQuillFontSizeAtCursor(range) {

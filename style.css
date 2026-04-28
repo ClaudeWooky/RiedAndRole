@@ -1231,6 +1231,8 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
 .bam-content .ql-svg-inline { display:inline-flex;align-items:center;vertical-align:middle; }
 .bam-content .ql-svg-inline img { max-width:none;border-radius:0;margin:0;vertical-align:middle; }
 .bam-content strong { color:#1a1a2e; }
+/* Neutralise les propriétés de layout de .ql-editor qui conflictuent en contexte public */
+#bam-content.ql-editor { padding:0;height:auto;overflow-y:visible;white-space:normal; }
 .blog-article-clickable { cursor:pointer;transition:transform .2s; }
 .blog-article-clickable:hover { transform:translateY(-3px); }
 .ba-read-more { display:inline-block;margin-top:.6rem;font-size:.82rem;color:var(--accent);font-weight:600;letter-spacing:.04em; }
