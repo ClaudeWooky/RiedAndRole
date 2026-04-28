@@ -51,7 +51,12 @@ try {
 
 function _botToken()    { return _botCfg.token    || process.env.DISCORD_BOT_TOKEN || _cfg.discordBotToken || ''; }
 function _botGuildId()  { return _botCfg.guildId  || discordGuildId(); }
-function discordChannels() { return _botCfg.channels || _cfg.discordChannels || {}; }
+function discordChannels() {
+  if (_botCfg.channels) return _botCfg.channels;
+  if (_cfg.discordChannels) return _cfg.discordChannels;
+  try { const e = process.env.DISCORD_CHANNELS; if (e) return JSON.parse(e); } catch {}
+  return {};
+}
 
 /* ── Bot Discord intégré (discord.js optionnel) ──────────────────── */
 let _discord      = null; // { client, REST, Routes, EmbedBuilder } après require
@@ -750,8 +755,12 @@ const server = http.createServer(async (req, res) => {
       if (!session) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'Session expirée, veuillez vous reconnecter.' })); return; }
 
       if (!_isBotReady()) {
+        const missing = [];
+        if (!_botToken())   missing.push('DISCORD_BOT_TOKEN');
+        if (!_botGuildId()) missing.push('DISCORD_GUILD_ID');
+        const detail = missing.length ? ` (variables manquantes : ${missing.join(', ')})` : ' (connexion en cours ou token invalide)';
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Bot Discord non connecté.' }));
+        res.end(JSON.stringify({ ok: false, error: 'Bot Discord non connecté' + detail }));
         return;
       }
 
