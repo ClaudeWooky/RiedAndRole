@@ -1687,9 +1687,18 @@ function _htmlToDiscordMd(html) {
 
 function _extractImageUrls(html) {
   const urls = [];
-  const re = /<img\b[^>]+src="(https?:\/\/[^"]+)"[^>]*>/gi;
+  const re = /<img\b[^>]+src="([^"]+)"[^>]*>/gi;
   let m;
-  while ((m = re.exec(html || '')) !== null) urls.push(m[1]);
+  while ((m = re.exec(html || '')) !== null) {
+    const src = m[1].trim();
+    if (!src || src.startsWith('data:')) continue; // ignorer les data URI (base64)
+    if (/^https?:\/\//i.test(src)) {
+      urls.push(src);
+    } else {
+      // Chemin relatif (ex: /assets/blog/svg/livres.svg) → URL absolue
+      urls.push(location.origin + (src.startsWith('/') ? '' : '/') + src);
+    }
+  }
   return urls;
 }
 

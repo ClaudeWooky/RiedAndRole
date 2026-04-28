@@ -125,15 +125,15 @@ async function botBlog(title, category, author, excerpt, imageUrls) {
     .setColor(_BOT_COLOR);
   if (author)  embed.setAuthor({ name: ('Auteur : ' + String(author)).slice(0, 256) });
   if (excerpt) embed.setDescription(String(excerpt).slice(0, 4096));
-  const imgs = Array.isArray(imageUrls) ? imageUrls : [];
+  const imgs = (Array.isArray(imageUrls) ? imageUrls : []).filter(u => typeof u === 'string' && u.trim()).slice(0, 10);
   if (ch.type === 15) {
     const thread = await ch.threads.create({ name: String(title).slice(0, 100), message: { embeds: [embed] } });
-    for (const url of imgs) await thread.send(url);
+    for (const url of imgs) { try { await thread.send({ files: [url] }); } catch { await thread.send(url); } }
     console.log(`[bot] Blog dans forum #${ch.name} (fil ${thread.id}, ${imgs.length} image(s))`);
     return { messageId: thread.id };
   }
   const msg = await ch.send({ embeds: [embed] });
-  for (const url of imgs) await ch.send(url);
+  for (const url of imgs) { try { await ch.send({ files: [url] }); } catch { await ch.send(url); } }
   console.log(`[bot] Blog dans #${ch.name} (cat=${category || 'default'}, ${imgs.length} image(s))`);
   return { messageId: msg.id };
 }
