@@ -1633,7 +1633,21 @@ function renderBlog() {
 function _htmlToDiscordMd(html) {
   if (!html) return '';
   let s = html;
-  // Supprime les images (traitées séparément via _extractFirstImageUrl)
+  // Remplace les icônes SVG (blot Quill ql-svg-inline ou img direct) par des emojis Discord
+  const _svgEmoji = src => {
+    const name = (src || '').split('/').pop().split('?')[0].toLowerCase();
+    if (name === 'des.svg')    return ':game_die:';
+    if (name === 'livres.svg') return ':books:';
+    if (name === 'coeur.svg')  return ':heart_hands:';
+    if (name === 'pencil.svg') return ':pencil:';
+    return ':point_right:';
+  };
+  s = s.replace(/<span\b(?=[^>]*\bql-svg-inline\b)[^>]*>[\s\S]*?<\/span>/gi, match => {
+    const m = match.match(/data-src="([^"]*)"/i);
+    return _svgEmoji(m ? m[1] : '');
+  });
+  s = s.replace(/<img\b[^>]*src="([^"]*\.svg[^"]*)"[^>]*/gi, (_, src) => _svgEmoji(src));
+  // Supprime les images non-SVG (traitées séparément via _extractImageUrls)
   s = s.replace(/<img\b[^>]*>/gi, '');
   // h1/h2 → titres Discord ; h3-h6 → paragraphes simples
   // (Quill utilise souvent <h3> comme conteneur de paragraphe normal)
@@ -1691,7 +1705,7 @@ function _extractImageUrls(html) {
   let m;
   while ((m = re.exec(html || '')) !== null) {
     const src = m[1].trim();
-    if (!src || src.startsWith('data:')) continue; // ignorer les data URI (base64)
+    if (!src || src.startsWith('data:') || /\.svg(\?.*)?$/i.test(src)) continue; // ignorer data URI et icônes SVG (non affichables inline sur Discord)
     if (/^https?:\/\//i.test(src)) {
       urls.push(src);
     } else {
