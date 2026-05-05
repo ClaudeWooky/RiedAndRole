@@ -14,9 +14,9 @@ function escHtml(str) {
 const FR_MONTHS = { Jan:0, 'Fév':1, Mar:2, Avr:3, Mai:4, Jun:5, Jul:6, 'Aoû':7, Sep:8, Oct:9, Nov:10, 'Déc':11 };
 
 /* ─── In-memory data store (populated by loadAllData) ────────────── */
-const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [] };
+const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [], library: [] };
 
-const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda' };
+const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda', library:'rr_library' };
 
 const BLOG_CATS = {
   'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)', image: '/assets/blog/annonce.png' },
@@ -29,6 +29,17 @@ const BLOG_CATS = {
   'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)', image: '/assets/blog/cr.png' },
   'bons-plans':     { label: 'Bons plans',             color: 'yellow', icon: '💡', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)', image: '/assets/blog/bonsPlans.png' },
   'culture-geek':   { label: 'Culture Geek',           color: 'cyan',   icon: '🤓', gradient: 'linear-gradient(135deg,#001a1a,#004d4d)' },
+};
+
+const BOOK_GENRES = {
+  'jdr':        { label: 'Jeu de Rôle',      color: 'purple', icon: '🎲', gradient: 'linear-gradient(135deg,#1a0a2e,#4b1c7d)' },
+  'jds':        { label: 'Jeu de société',   color: 'blue',   icon: '♟️', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' },
+  'roman':      { label: 'Roman',            color: 'indigo', icon: '📚', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
+  'bd':         { label: 'BD',               color: 'orange', icon: '🎨', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
+  'manga':      { label: 'Manga',            color: 'red',    icon: '⚔️', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)' },
+  'artbook':    { label: 'Artbook',          color: 'teal',   icon: '🖼️', gradient: 'linear-gradient(135deg,#001014,#002535)' },
+  'accessoire': { label: 'Accessoire',       color: 'green',  icon: '🎯', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)' },
+  'autre':      { label: 'Autre',            color: 'yellow', icon: '📦', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)' },
 };
 
 function formatBlogDate(isoDate) {
@@ -65,9 +76,11 @@ let _calMonth = new Date().getMonth();
   loadDynamicBlog();
   loadHomeBlog();
   loadDynamicAgenda();
+  loadDynamicLibrary();
   await applyStatConfig();
   initNotifWidget();
   _initBlogArticleModal();
+  _initBookModal();
 })();
 
 function loadHomeGames() {
@@ -470,6 +483,155 @@ function loadHomeBlog() {
       </div>
     </article>`;
   }).join('');
+}
+
+/* ─── Library ───────────────────────────────────────────────────── */
+function loadDynamicLibrary() {
+  const container = document.getElementById('library-grid');
+  if (!container) return;
+  const books = _data.library || [];
+
+  const statsEl = document.getElementById('library-stats');
+  if (statsEl) {
+    if (!books.length) {
+      statsEl.innerHTML = '<div class="lib-stat"><span class="lib-stat-num">0</span><span class="lib-stat-label">Ouvrages</span></div>';
+    } else {
+      const counts = {};
+      books.forEach(b => { counts[b.genre] = (counts[b.genre] || 0) + 1; });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+      statsEl.innerHTML = `<div class="lib-stat"><span class="lib-stat-num">${books.length}</span><span class="lib-stat-label">Ouvrages</span></div>`
+        + top.map(([g, c]) => {
+          const genre = BOOK_GENRES[g] || { label: g, icon: '📚' };
+          return `<div class="lib-stat"><span class="lib-stat-num">${c}</span><span class="lib-stat-label">${escHtml(genre.icon)} ${escHtml(genre.label)}</span></div>`;
+        }).join('');
+    }
+  }
+
+  const countEl = document.getElementById('lib-count');
+  if (countEl) countEl.textContent = books.length + (books.length === 1 ? ' ouvrage' : ' ouvrages');
+
+  if (!books.length) {
+    container.innerHTML = '<p class="lib-empty">La bibliothèque est vide pour l\'instant.</p>';
+    return;
+  }
+
+  _renderBookGrid(books);
+  _initLibraryFilters();
+}
+
+function _renderBookGrid(books) {
+  const container = document.getElementById('library-grid');
+  if (!container) return;
+  if (!books.length) {
+    container.innerHTML = '<p class="lib-empty">Aucun résultat.</p>';
+    return;
+  }
+  container.innerHTML = books.map(b => {
+    const genre = BOOK_GENRES[b.genre] || { label: b.genre || '', color: 'blue', icon: '📚', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+    const coverStyle = b.cover
+      ? `background:#111;background-image:url('${escHtml(b.cover)}');background-size:cover;background-position:center`
+      : `background:${escHtml(genre.gradient)}`;
+    const stars = _renderBookStars(b.rating || 0);
+    return `
+    <div class="book-card" data-book-id="${escHtml(b.id)}" data-genre="${escHtml(b.genre || '')}">
+      <div class="book-cover" style="${coverStyle}">
+        ${b.cover ? '' : `<div class="book-cover-icon">${escHtml(genre.icon)}</div>`}
+        <span class="tag tag-${escHtml(genre.color)} book-genre-tag">${escHtml(genre.label)}</span>
+      </div>
+      <div class="book-body">
+        <h3>${escHtml(b.title)}</h3>
+        ${b.author ? `<p class="book-author">${escHtml(b.author)}</p>` : ''}
+        ${b.year   ? `<p class="book-year">${escHtml(b.year)}</p>` : ''}
+        ${stars}
+      </div>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.book-card').forEach(el => {
+    el.addEventListener('click', () => _openBookModal(el.dataset.bookId));
+  });
+}
+
+function _renderBookStars(rating) {
+  if (!rating) return '';
+  const r = Math.min(5, Math.max(0, Math.round(rating)));
+  return `<div class="book-stars">${'★'.repeat(r)}${'☆'.repeat(5 - r)}</div>`;
+}
+
+function _initLibraryFilters() {
+  const search     = document.getElementById('lib-search');
+  const filterBtns = document.querySelectorAll('.lib-filter-btn');
+  let activeGenre  = 'all';
+
+  function applyFilters() {
+    const q = (search?.value || '').toLowerCase().trim();
+    const filtered = (_data.library || []).filter(b => {
+      if (activeGenre !== 'all' && b.genre !== activeGenre) return false;
+      if (!q) return true;
+      return (b.title || '').toLowerCase().includes(q)
+          || (b.author || '').toLowerCase().includes(q)
+          || (b.system || '').toLowerCase().includes(q)
+          || (b.publisher || '').toLowerCase().includes(q);
+    });
+    _renderBookGrid(filtered);
+    const countEl = document.getElementById('lib-count');
+    if (countEl) countEl.textContent = filtered.length + (filtered.length === 1 ? ' ouvrage' : ' ouvrages');
+  }
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeGenre = btn.dataset.genre;
+      applyFilters();
+    });
+  });
+
+  if (search) search.addEventListener('input', applyFilters);
+}
+
+function _openBookModal(id) {
+  const b = (_data.library || []).find(bk => bk.id === id);
+  if (!b) return;
+  const genre  = BOOK_GENRES[b.genre] || { label: b.genre || '', color: 'blue', icon: '📚', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+  const header = document.getElementById('bm-header');
+  const icon   = document.getElementById('bm-icon');
+  if (b.cover) {
+    header.style.background         = '#111';
+    header.style.backgroundImage    = `url('${b.cover}')`;
+    header.style.backgroundSize     = 'cover';
+    header.style.backgroundPosition = 'center';
+    icon.style.display = 'none';
+  } else {
+    header.style.background         = genre.gradient;
+    header.style.backgroundImage    = '';
+    header.style.backgroundSize     = '';
+    header.style.backgroundPosition = '';
+    icon.textContent   = genre.icon;
+    icon.style.display = '';
+  }
+  document.getElementById('bm-tag').textContent    = genre.label;
+  document.getElementById('bm-tag').className      = `tag tag-${escHtml(genre.color)}`;
+  document.getElementById('bm-title').textContent  = b.title;
+  document.getElementById('bm-author').textContent = b.author || '';
+  const meta = [];
+  if (b.system)    meta.push(`Système : ${b.system}`);
+  if (b.publisher) meta.push(`Éditeur : ${b.publisher}`);
+  if (b.year)      meta.push(b.year);
+  document.getElementById('bm-meta').textContent   = meta.join('  ·  ');
+  document.getElementById('bm-stars').innerHTML    = _renderBookStars(b.rating || 0);
+  const descEl = document.getElementById('bm-desc');
+  descEl.textContent  = b.description || '';
+  descEl.style.display = b.description ? '' : 'none';
+  document.getElementById('book-modal-overlay').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function _initBookModal() {
+  const overlay = document.getElementById('book-modal-overlay');
+  if (!overlay) return;
+  function close() { overlay.hidden = true; document.body.style.overflow = ''; }
+  document.getElementById('bm-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 }
 
 /* ─── Games ──────────────────────────────────────────────────────── */

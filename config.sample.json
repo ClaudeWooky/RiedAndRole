@@ -7,5 +7,8 @@
   "smtpSecure": false,
   "smtpUser":   "ried.and.role@gmail.com",
   "smtpPass":   "xxxx xxxx xxxx xxxx",
-  "smtpFrom":   "\"Ried & Rôle\" <ried.and.role@gmail.com>"
+  "smtpFrom":   "\"Ried & Rôle\" <ried.and.role@gmail.com>",
+
+  "igdbClientId":     "votre_twitch_client_id",
+  "igdbClientSecret": "votre_twitch_client_secret"
 }

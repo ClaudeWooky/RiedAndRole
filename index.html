@@ -46,7 +46,8 @@
             <li><a href="#jeux"         class="nav-link" data-target="jeux">Jeux de Rôles</a></li>
             <li><a href="#evenements"   class="nav-link" data-target="evenements">Événements</a></li>
             <li><a href="#agenda"       class="nav-link" data-target="agenda">Agenda</a></li>
-            <li><a href="#blog"         class="nav-link" data-target="blog">Blog</a></li>
+            <li><a href="#blog"          class="nav-link" data-target="blog">Blog</a></li>
+            <li><a href="#bibliotheque" class="nav-link" data-target="bibliotheque">Bibliothèque</a></li>
             <li><a href="#equipe"       class="nav-link" data-target="equipe">L'Équipe</a></li>
             <li><a href="#contacts"     class="nav-link" data-target="contacts">Contacts</a></li>
           </ul>
@@ -378,6 +379,45 @@
               </div>
             </aside>
           </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════  BIBLIOTHÈQUE  ══════════════════════════ -->
+    <section id="bibliotheque" class="page">
+      <div class="page-hero" style="background:linear-gradient(135deg,#0a0f1a 0%,#1a0a3a 50%,#0a1a1a 100%);">
+        <div class="page-hero-content">
+          <p class="hero-eyebrow">&#9670; Nos acquisitions</p>
+          <h1>La <span class="accent">Bibliothèque</span></h1>
+          <p>Tous les livres et produits détenus par l'association</p>
+        </div>
+      </div>
+
+      <div class="section-wrap">
+        <div class="container">
+
+          <div id="library-stats" class="lib-stats"></div>
+
+          <div class="lib-toolbar">
+            <div class="lib-filters" id="lib-filters">
+              <button class="lib-filter-btn active" data-genre="all">Tous</button>
+              <button class="lib-filter-btn" data-genre="jdr">🎲 Jeu de Rôle</button>
+              <button class="lib-filter-btn" data-genre="jds">♟️ Jeu de société</button>
+              <button class="lib-filter-btn" data-genre="roman">📚 Roman</button>
+              <button class="lib-filter-btn" data-genre="bd">🎨 BD</button>
+              <button class="lib-filter-btn" data-genre="manga">⚔️ Manga</button>
+              <button class="lib-filter-btn" data-genre="artbook">🖼️ Artbook</button>
+              <button class="lib-filter-btn" data-genre="accessoire">🎯 Accessoire</button>
+              <button class="lib-filter-btn" data-genre="autre">📦 Autre</button>
+            </div>
+            <div class="lib-search-wrap">
+              <input type="search" id="lib-search" class="lib-search" placeholder="Rechercher un titre, auteur…" />
+              <span id="lib-count" class="lib-count"></span>
+            </div>
+          </div>
+
+          <div id="library-grid" class="library-grid"></div>
 
         </div>
       </div>
@@ -759,6 +799,24 @@
             Facebook
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════  MODAL LIVRE  ══════════════ -->
+  <div id="book-modal-overlay" class="modal-overlay" hidden>
+    <div class="book-modal">
+      <div class="bm-header" id="bm-header">
+        <div class="bm-header-icon" id="bm-icon"></div>
+        <button type="button" id="bm-close" class="bam-close">&#x2715;</button>
+      </div>
+      <div class="bm-body">
+        <span class="tag" id="bm-tag"></span>
+        <h2 class="bam-title" id="bm-title"></h2>
+        <p class="bm-author" id="bm-author"></p>
+        <div class="bam-meta" id="bm-meta"></div>
+        <div id="bm-stars" class="bm-stars"></div>
+        <p class="bm-desc" id="bm-desc"></p>
       </div>
     </div>
   </div>

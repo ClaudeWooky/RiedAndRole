@@ -9,12 +9,13 @@ const SESSION_KEY = 'rr_admin_auth';
 const TOKEN_KEY   = 'rr_admin_token';
 const PERMS_KEY   = 'rr_admin_perms';
 
-const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', agenda: 'agenda', site: 'site' };
+const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', bibliotheque: 'bibliotheque', agenda: 'agenda', site: 'site' };
 
 let editingTeamId    = null;
 let editingEventId   = null;
 let editingGameId    = null;
-let editingBlogId    = null;
+let editingBlogId      = null;
+let editingLibraryId   = null;
 let editingAgendaId  = null;
 let editingAccountId = null;
 let currentPhotoData     = null;
@@ -34,6 +35,7 @@ const KEYS = {
   regs:      'registrations',
   tables:    'tables',
   blog:      'blog',
+  library:   'library',
   site:      'site',
   subs:      'subscriptions',
   evtnotif:  'event_notif_subs',
@@ -52,6 +54,17 @@ const BLOG_CATS = {
   'compte-rendu':   { label: 'Compte rendu de partie', color: 'indigo', icon: '📖', gradient: 'linear-gradient(135deg,#08001a,#180040)', image: '/assets/blog/cr.png' },
   'bons-plans':     { label: 'Bons plans',             color: 'yellow', icon: '💡', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)', image: '/assets/blog/bonsPlans.png' },
   'culture-geek':   { label: 'Culture Geek',           color: 'cyan',   icon: '🤓', gradient: 'linear-gradient(135deg,#001a1a,#004d4d)' },
+};
+
+const BOOK_GENRES = {
+  'jdr':        { label: 'Jeu de Rôle',      color: 'purple', icon: '🎲', gradient: 'linear-gradient(135deg,#1a0a2e,#4b1c7d)' },
+  'jds':        { label: 'Jeu de société',   color: 'blue',   icon: '♟️', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' },
+  'roman':      { label: 'Roman',            color: 'indigo', icon: '📚', gradient: 'linear-gradient(135deg,#08001a,#180040)' },
+  'bd':         { label: 'BD',               color: 'orange', icon: '🎨', gradient: 'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
+  'manga':      { label: 'Manga',            color: 'red',    icon: '⚔️', gradient: 'linear-gradient(135deg,#1a0808,#7d1c1c)' },
+  'artbook':    { label: 'Artbook',          color: 'teal',   icon: '🖼️', gradient: 'linear-gradient(135deg,#001014,#002535)' },
+  'accessoire': { label: 'Accessoire',       color: 'green',  icon: '🎯', gradient: 'linear-gradient(135deg,#0a1a0a,#1c5c1c)' },
+  'autre':      { label: 'Autre',            color: 'yellow', icon: '📦', gradient: 'linear-gradient(135deg,#1a1500,#4d3d00)' },
 };
 
 /* ─── In-memory cache (populated by initData) ────────────────────── */
@@ -84,9 +97,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindGameImageInput();
   bindForms();
   bindBlogForm();
+  bindLibraryForm();
   bindAgendaForm();
   bindSiteForm();
   bindAccountForm();
+  bindBackupRestore();
   renderAll();
 });
 
@@ -97,7 +112,7 @@ function checkAuth() {
   if (sessionStorage.getItem(SESSION_KEY) === 'true') {
     showShell();
     const perms = JSON.parse(sessionStorage.getItem(PERMS_KEY) || 'null');
-    applyPermissions(perms || ['evenements','agenda','jeux','equipe','blog','site']);
+    applyPermissions(perms || ['evenements','agenda','jeux','equipe','blog','bibliotheque','site']);
   }
 }
 
@@ -962,6 +977,7 @@ function renderAll() {
   renderGames();
   renderTeam();
   renderBlog();
+  renderLibrary();
   renderAgenda();
   renderSite();
 }
@@ -1628,6 +1644,318 @@ function renderBlog() {
   list.querySelectorAll('.btn-discord-blog').forEach(btn => {
     btn.addEventListener('click', () => _sendDiscordBlog(btn.dataset.discordBlog, btn));
   });
+}
+
+/* ─── Library ────────────────────────────────────────────────────── */
+function renderLibrary() {
+  const items = getData(KEYS.library);
+  const list  = document.getElementById('list-library');
+  const count = document.getElementById('count-library');
+  if (!list) return;
+  if (count) count.textContent = items.length;
+  if (!items.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun ouvrage enregistré.</p>';
+    return;
+  }
+  list.innerHTML = items.map(item => {
+    const genre = BOOK_GENRES[item.genre] || { label: item.genre || '', color: 'blue', icon: '📚' };
+    const stars = item.rating ? '★'.repeat(item.rating) : '';
+    return `
+    <div class="admin-item">
+      <div class="admin-item-info">
+        <div class="admin-item-title">${esc(genre.icon)} ${esc(item.title)}</div>
+        <div class="admin-item-meta">${esc(item.author || '—')}${item.year ? ' · ' + esc(item.year) : ''}</div>
+        <div class="admin-item-badges">
+          <span class="admin-item-badge badge-${esc(genre.color)}">${esc(genre.label)}</span>
+          ${stars ? `<span class="admin-item-badge badge-yellow">${esc(stars)}</span>` : ''}
+        </div>
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn-edit" data-edit-library="${esc(item.id)}">Modifier</button>
+        <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.library}">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+  bindDeleteButtons(list, KEYS.library, renderLibrary, null, 'title');
+  list.querySelectorAll('.btn-edit[data-edit-library]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = getData(KEYS.library).find(b => b.id === btn.dataset.editLibrary);
+      if (item) populateLibraryForm(item);
+    });
+  });
+}
+
+function populateLibraryForm(item) {
+  editingLibraryId = item.id;
+  const form = document.getElementById('form-library');
+  const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val ?? ''; };
+  set('title', item.title);
+  set('genre', item.genre);
+  const formTitle = document.getElementById('library-form-title');
+  if (formTitle) formTitle.textContent = "Modifier l'ouvrage";
+  const lookupBtn = document.getElementById('lib-lookup-btn');
+  if (lookupBtn) lookupBtn.innerHTML = '&#128269; Rechercher (modifier)';
+  if (!form.querySelector('.btn-cancel-edit')) {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn btn-outline-sm btn-full btn-cancel-edit';
+    cancelBtn.textContent = 'Annuler la modification';
+    cancelBtn.style.marginTop = '0.5rem';
+    cancelBtn.addEventListener('click', cancelLibraryEdit);
+    lookupBtn.after(cancelBtn);
+  }
+  form.closest('.admin-form-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelLibraryEdit() {
+  editingLibraryId = null;
+  const form = document.getElementById('form-library');
+  form.reset();
+  const formTitle = document.getElementById('library-form-title');
+  if (formTitle) formTitle.textContent = 'Nouvel ouvrage';
+  const lookupBtn = document.getElementById('lib-lookup-btn');
+  if (lookupBtn) lookupBtn.innerHTML = '&#128269; Rechercher';
+  form.querySelector('.btn-cancel-edit')?.remove();
+}
+
+let _lookupAbort   = null;
+let _lookupResults = {};   // source → tableau de résultats
+
+async function _libraryLookup() {
+  const titleEl = document.getElementById('lib-title-input');
+  const genreEl = document.querySelector('#form-library [name="genre"]');
+  const btn     = document.getElementById('lib-lookup-btn');
+  if (!titleEl) return;
+
+  const q     = titleEl.value.trim();
+  const genre = genreEl ? genreEl.value : '';
+  if (!q) { showToast('Entrez un titre avant de rechercher.', true); return; }
+
+  if (_lookupAbort) _lookupAbort.abort();
+  _lookupAbort = new AbortController();
+  const signal = _lookupAbort.signal;
+  const token  = sessionStorage.getItem('rr_admin_token') || '';
+
+  btn.disabled  = true;
+  btn.innerHTML = '⌛ Recherche…';
+  _openLibLookupPopup(genre);
+
+  const useOL   = ['roman', 'bd', 'manga', 'artbook'].includes(genre);
+  const useBBE  = ['jdr', 'jds'].includes(genre);
+  const byGenre = useBBE ? ['BBE', 'BoardGameGeek', 'BnF', 'IGDB']
+                : useOL  ? ['OpenLibrary', 'BnF']
+                :           ['BoardGameGeek', 'BnF', 'IGDB'];
+  const checked = [...document.querySelectorAll('#lib-sources-group input[name="src"]:checked')].map(cb => cb.value);
+  const sources = byGenre.filter(s => checked.includes(s));
+  if (!sources.length) { btn.innerHTML = '&#128269; Rechercher'; return; }
+
+  // Une requête indépendante par source — chacune met à jour le popup dès réception
+  const fetches = sources.map(src =>
+    fetch(`/api/library-lookup?q=${encodeURIComponent(q)}&genre=${encodeURIComponent(genre)}&source=${encodeURIComponent(src)}`, {
+      headers: { 'Authorization': 'Bearer ' + token },
+      signal
+    })
+    .then(resp => {
+      if (resp.status === 401) { _closeLibLookupPopup(); showToast('Session expirée — veuillez vous reconnecter.', true); return; }
+      if (!resp.ok) throw new Error(`${resp.status}`);
+      return resp.json();
+    })
+    .then(data => { if (data) _updateLibLookupSource(src, data.results || []); })
+    .catch(e  => { if (e.name !== 'AbortError') _updateLibLookupSource(src, []); })
+  );
+
+  await Promise.allSettled(fetches);
+  btn.disabled  = false;
+  btn.innerHTML = '&#128269; Rechercher';
+}
+
+const _BBE_SOURCE_LABELS = {
+  'OpenLibrary':       '📖 Open Library',
+  'BoardGameGeek':     '🎲 Board Game Geek',
+  'BnF':               '🇫🇷 BnF — Bibliothèque nationale de France',
+  'IGDB':              '🎮 IGDB',
+  'BBE': '🕷️ Black Book Éditions'
+};
+
+function _openLibLookupPopup(genre) {
+  _lookupResults = {};
+  let overlay = document.getElementById('lib-lookup-popup-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'lib-lookup-popup-overlay';
+    overlay.className = 'lib-lookup-popup-overlay';
+    overlay.innerHTML = `
+      <div class="lib-lookup-popup" role="dialog" aria-modal="true">
+        <div class="lib-lookup-popup-header">
+          <span class="lib-lookup-popup-title">&#128269; Résultats de recherche</span>
+          <button type="button" id="lib-lookup-popup-close" class="lib-lookup-popup-close" aria-label="Fermer">&#10005;</button>
+        </div>
+        <div id="lib-lookup-popup-list" class="lib-lookup-popup-list"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('#lib-lookup-popup-close'))
+        _closeLibLookupPopup();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && overlay && !overlay.hidden) _closeLibLookupPopup();
+    });
+  }
+
+  overlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  const useOL   = ['roman', 'bd', 'manga', 'artbook'].includes(genre);
+  const useBBE  = ['jdr', 'jds'].includes(genre);
+  const byGenre = useBBE ? ['BBE', 'BoardGameGeek', 'BnF', 'IGDB']
+                : useOL  ? ['OpenLibrary', 'BnF']
+                :           ['BoardGameGeek', 'BnF', 'IGDB'];
+  const checked = [...document.querySelectorAll('#lib-sources-group input[name="src"]:checked')].map(cb => cb.value);
+  const sources = byGenre.filter(s => checked.includes(s));
+
+  document.getElementById('lib-lookup-popup-list').innerHTML = sources.map(src => `
+    <div class="lib-lookup-source-section" data-source="${src}">
+      <div class="lib-lookup-source-heading">
+        ${_BBE_SOURCE_LABELS[src] || esc(src)}<span class="lib-lookup-spinner"></span>
+      </div>
+      <div class="lib-lookup-source-results"></div>
+    </div>`).join('');
+}
+
+function _libFallbackUrl(r) {
+  const q = encodeURIComponent(r.title || '');
+  switch (r.source) {
+    case 'OpenLibrary':    return `https://openlibrary.org/search?title=${q}`;
+    case 'BoardGameGeek':  return `https://boardgamegeek.com/search?q=${q}&objecttype=boardgame`;
+    case 'BnF':            return `https://catalogue.bnf.fr/rechercher.do?index=MOTS&motRecherche=${q}`;
+    case 'IGDB':           return `https://www.igdb.com/search?type=1&q=${q}`;
+    case 'BBE':            return `https://shop.black-book-editions.fr/catalogue/recherche?nameLike=${q}`;
+    default:               return null;
+  }
+}
+
+function _updateLibLookupSource(source, results) {
+  _lookupResults[source] = results;
+  const section = [...document.querySelectorAll('#lib-lookup-popup-list .lib-lookup-source-section')]
+    .find(el => el.dataset.source === source);
+  if (!section) return;
+
+  section.querySelector('.lib-lookup-spinner')?.remove();
+
+  if (!results.length) {
+    section.querySelector('.lib-lookup-source-results').innerHTML =
+      '<p class="lib-lookup-no-results">Aucun résultat</p>';
+    return;
+  }
+
+  section.querySelector('.lib-lookup-source-results').innerHTML = results.map((r, i) => {
+    const hasUrl = !!(r.url || r.title);
+    return `
+    <div class="lib-lookup-card" data-idx="${i}" tabindex="0" role="link" aria-label="${esc(r.title)}">
+      <div class="lib-lookup-card-cover">
+        ${r.cover
+          ? `<img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span>📚</span>'">`
+          : '<span>📚</span>'}
+      </div>
+      <div class="lib-lookup-card-info">
+        <div class="lib-lookup-card-title">${esc(r.title)}</div>
+        ${r.author    ? `<div class="lib-lookup-card-meta">✍️ ${esc(r.author)}</div>` : ''}
+        ${r.year || r.publisher ? `<div class="lib-lookup-card-meta">${[r.year, r.publisher].filter(Boolean).map(s => esc(s)).join(' · ')}</div>` : ''}
+        ${r.description ? `<div class="lib-lookup-card-desc">${esc(r.description)}</div>` : ''}
+      </div>
+      <button class="lib-lookup-card-add" data-idx="${i}" title="Ajouter à la bibliothèque" type="button">＋</button>
+    </div>`;
+  }).join('');
+
+  section.querySelectorAll('.lib-lookup-card').forEach(el => {
+    const getResult = () => {
+      const src = el.closest('[data-source]').dataset.source;
+      return (_lookupResults[src] || [])[parseInt(el.dataset.idx, 10)];
+    };
+
+    // Clic sur la carte → ouvre l'URL dans un nouvel onglet
+    el.addEventListener('click', e => {
+      if (e.target.closest('.lib-lookup-card-add')) return;
+      const r = getResult();
+      if (!r) return;
+      const url = r.url || _libFallbackUrl(r);
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    });
+    el.addEventListener('keydown', e => {
+      if (e.target.closest('.lib-lookup-card-add')) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const r = getResult();
+        const url = r && (r.url || _libFallbackUrl(r));
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    });
+
+    // Bouton ＋ → ajoute l'ouvrage
+    el.querySelector('.lib-lookup-card-add').addEventListener('click', e => {
+      e.stopPropagation();
+      const r = getResult();
+      if (r) { _applyLibraryLookupResult(r); _closeLibLookupPopup(); }
+    });
+  });
+}
+
+function _closeLibLookupPopup() {
+  if (_lookupAbort) { _lookupAbort.abort(); _lookupAbort = null; }
+  const overlay = document.getElementById('lib-lookup-popup-overlay');
+  if (overlay) overlay.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function _applyLibraryLookupResult(r) {
+  const genreEl = document.querySelector('#form-library [name="genre"]');
+  const genre   = genreEl ? genreEl.value : '';
+  if (!genre) { showToast('Choisissez d\'abord un genre.', true); return; }
+
+  if (editingLibraryId) {
+    const items = getData(KEYS.library);
+    const idx = items.findIndex(b => b.id === editingLibraryId);
+    if (idx !== -1) {
+      items[idx] = {
+        ...items[idx],
+        genre,
+        title:       r.title       || items[idx].title,
+        author:      r.author      || '',
+        publisher:   r.publisher   || '',
+        year:        r.year        || '',
+        description: r.description || '',
+        cover:       r.cover       ?? items[idx].cover,
+      };
+      saveData(KEYS.library, items);
+      showToast('Ouvrage modifié.');
+      cancelLibraryEdit();
+    }
+  } else {
+    prepend(KEYS.library, {
+      id:          genId('book'),
+      title:       r.title       || '',
+      author:      r.author      || '',
+      genre,
+      system:      '',
+      publisher:   r.publisher   || '',
+      year:        r.year        || '',
+      description: r.description || '',
+      rating:      0,
+      cover:       r.cover       || null,
+    });
+    showToast('Ouvrage ajouté !');
+    const titleEl = document.getElementById('lib-title-input');
+    if (titleEl) titleEl.value = '';
+  }
+  renderLibrary();
+}
+
+function bindLibraryForm() {
+  const form      = document.getElementById('form-library');
+  const lookupBtn = document.getElementById('lib-lookup-btn');
+  if (!form || !lookupBtn) return;
+  lookupBtn.addEventListener('click', _libraryLookup);
+  form.addEventListener('submit', e => e.preventDefault()); // bloquer soumission accidentelle
 }
 
 function _htmlToDiscordMd(html) {
@@ -2640,4 +2968,71 @@ function cancelAgendaEdit() {
   form.querySelector('button[type="submit"]').textContent = '+ Ajouter l\'entrée';
   const cancelBtn = form.querySelector('.btn-cancel-edit');
   if (cancelBtn) cancelBtn.remove();
+}
+
+/* ─── Backup / Restore ───────────────────────────────────────────── */
+function bindBackupRestore() {
+  const btnBackup    = document.getElementById('btn-backup-data');
+  const inputRestore = document.getElementById('input-restore-data');
+
+  if (btnBackup) {
+    btnBackup.addEventListener('click', async () => {
+      btnBackup.disabled = true;
+      btnBackup.textContent = '⏳ Préparation…';
+      try {
+        const res = await fetch('/api/backup-data', {
+          headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem(TOKEN_KEY) || '') }
+        });
+        if (!res.ok) throw new Error('Erreur serveur ' + res.status);
+        const blob = await res.blob();
+        const cd   = res.headers.get('Content-Disposition') || '';
+        const fnM  = cd.match(/filename="([^"]+)"/);
+        const filename = fnM ? fnM[1] : 'riedrolle-backup.zip';
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Sauvegarde téléchargée !');
+      } catch (err) {
+        showToast('Erreur : ' + err.message, true);
+      } finally {
+        btnBackup.disabled = false;
+        btnBackup.textContent = '💾 Sauvegarder les données';
+      }
+    });
+  }
+
+  if (inputRestore) {
+    inputRestore.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      inputRestore.value = '';
+      showConfirm(
+        `Importer « ${file.name} » ? Les données existantes seront remplacées par celles de l'archive. Cette action est irréversible.`,
+        async () => {
+          const label = document.querySelector('.backup-import-label');
+          if (label) { label.style.opacity = '.6'; label.style.pointerEvents = 'none'; }
+          try {
+            const res = await fetch('/api/restore-data', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem(TOKEN_KEY) || '') },
+              body: file
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`Import réussi — ${data.restored} fichier(s) restauré(s). Rechargement…`);
+              setTimeout(() => location.reload(), 2000);
+            } else {
+              showToast('Erreur : ' + (data.error || 'Import échoué'), true);
+            }
+          } catch (err) {
+            showToast('Erreur : ' + err.message, true);
+          } finally {
+            if (label) { label.style.opacity = ''; label.style.pointerEvents = ''; }
+          }
+        }
+      );
+    });
+  }
 }

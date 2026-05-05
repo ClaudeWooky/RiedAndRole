@@ -66,6 +66,9 @@
         <button class="admin-nav-btn" data-section="blog">
           <span class="nav-icon">&#128240;</span> Blog
         </button>
+        <button class="admin-nav-btn" data-section="bibliotheque">
+          <span class="nav-icon">&#128218;</span> Bibliothèque
+        </button>
         <button class="admin-nav-btn" data-section="site">
           <span class="nav-icon">&#9881;</span> Site
         </button>
@@ -435,6 +438,62 @@
         </div>
       </section>
 
+      <!-- ══════════════  SECTION BIBLIOTHÈQUE  ══════════════════════ -->
+      <section id="section-bibliotheque" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128218; Gestion de la Bibliothèque</h2>
+          <p>Les ouvrages ajoutés ici apparaîtront sur la page Bibliothèque du site.</p>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Ouvrages enregistrés</h3>
+              <span class="item-count" id="count-library">0</span>
+            </div>
+            <div id="list-library"></div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="admin-form-panel">
+            <h3 class="form-title" id="library-form-title">Nouvel ouvrage</h3>
+            <form id="form-library" novalidate>
+              <div class="form-group">
+                <label>Genre / Type *</label>
+                <select name="genre" required>
+                  <option value="">— Choisir —</option>
+                  <option value="jdr">🎲 Jeu de Rôle</option>
+                  <option value="jds">♟️ Jeu de société</option>
+                  <option value="roman">📚 Roman</option>
+                  <option value="bd">🎨 BD</option>
+                  <option value="manga">⚔️ Manga</option>
+                  <option value="artbook">🖼️ Artbook</option>
+                  <option value="accessoire">🎯 Accessoire</option>
+                  <option value="autre">📦 Autre</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Titre *</label>
+                <input type="text" name="title" id="lib-title-input" placeholder="Titre du livre ou produit" required autocomplete="off" />
+              </div>
+              <div class="form-group" id="lib-sources-group">
+                <label>Sources</label>
+                <div class="lib-sources-checkboxes">
+                  <label class="lib-source-cb"><input type="checkbox" name="src" value="BBE" checked> &#128375;&#65039; Black Book Éditions</label>
+                  <label class="lib-source-cb"><input type="checkbox" name="src" value="BoardGameGeek" checked> &#127922; Board Game Geek</label>
+                  <label class="lib-source-cb"><input type="checkbox" name="src" value="BnF" checked> &#127467;&#127479; BnF</label>
+                  <label class="lib-source-cb"><input type="checkbox" name="src" value="IGDB" checked> &#127918; IGDB</label>
+                  <label class="lib-source-cb"><input type="checkbox" name="src" value="OpenLibrary" checked> &#128218; Open Library</label>
+                </div>
+              </div>
+              <button type="button" id="lib-lookup-btn" class="btn btn-primary btn-full">&#128269; Rechercher</button>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
       <!-- ═══════════════  SECTION AGENDA  ═════════════════════════ -->
       <section id="section-agenda" class="admin-section">
         <div class="section-title-bar">
@@ -609,6 +668,27 @@
           </div>
         </div>
 
+        <!-- ── Sauvegarde des données ── -->
+        <div class="section-title-bar section-title-bar--sub">
+          <h2>&#128190; Sauvegarde des Données</h2>
+          <p>Exportez toutes les données du site en fichier .zip, ou restaurez-les depuis une sauvegarde.</p>
+        </div>
+        <div class="site-settings-panel backup-panel">
+          <div class="backup-actions">
+            <button type="button" id="btn-backup-data" class="btn btn-primary">
+              &#128190; Sauvegarder les données
+            </button>
+            <label class="btn btn-outline backup-import-label" style="cursor:pointer;">
+              &#128228; Importer les données
+              <input type="file" id="input-restore-data" accept=".zip" style="display:none;" />
+            </label>
+          </div>
+          <p class="form-hint" style="margin-top:.75rem;">
+            La sauvegarde télécharge un fichier <code>.zip</code> contenant tous les fichiers JSON du dossier <code>/data</code>.
+            L'importation remplace les fichiers existants par ceux de l'archive sélectionnée.
+          </p>
+        </div>
+
         <!-- ── Comptes administrateur ── -->
         <div class="section-title-bar section-title-bar--sub">
           <h2>&#128100; Comptes Administrateur</h2>
@@ -676,6 +756,10 @@
                   <label class="perm-label">
                     <input type="checkbox" class="acc-perm-cb" value="blog" />
                     <span>Blog</span>
+                  </label>
+                  <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="bibliotheque" />
+                    <span>Bibliothèque</span>
                   </label>
                   <label class="perm-label">
                     <input type="checkbox" class="acc-perm-cb" value="site" />
