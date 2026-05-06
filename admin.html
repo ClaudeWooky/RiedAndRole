@@ -864,6 +864,31 @@
   </div>
 
   <!-- ══════════════  MODAL CONFIRMATION  ══════════════ -->
+  <!-- ══════════════  POPUP SAUVEGARDE  ══════════════ -->
+  <div id="backup-select-overlay" class="modal-overlay" hidden>
+    <div class="modal-card backup-select-card">
+      <h3 class="backup-select-title">&#128190; Sauvegarder les données</h3>
+      <p class="backup-select-hint">Choisissez les sections à inclure dans le fichier <code>.zip</code> :</p>
+      <div class="backup-select-grid">
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="agenda"        checked> Agenda</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="library"       checked> Bibliothèque</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="blog"          checked> Blog</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="events"        checked> Événements</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="games"         checked> Jeux</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="team"          checked> L'Équipe</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="notifications" checked> Notifications</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="wishlist"      checked> Wishlist</label>
+      </div>
+      <div class="backup-select-footer">
+        <button type="button" id="backup-select-all"    class="btn-text-link">Tout sélectionner</button>
+        <button type="button" id="backup-deselect-all"  class="btn-text-link">Tout désélectionner</button>
+        <div style="flex:1"></div>
+        <button type="button" id="backup-select-cancel" class="btn-confirm-no">Annuler</button>
+        <button type="button" id="backup-select-ok"     class="btn-confirm-yes">&#128190; Télécharger</button>
+      </div>
+    </div>
+  </div>
+
   <div id="confirm-overlay" class="modal-overlay" hidden>
     <div class="modal-card" style="max-width:380px;text-align:center;">
       <p id="confirm-msg" style="margin-bottom:1.5rem;font-size:1rem;line-height:1.6;color:var(--text-light);"></p>

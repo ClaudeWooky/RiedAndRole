@@ -14,9 +14,9 @@ function escHtml(str) {
 const FR_MONTHS = { Jan:0, 'Fév':1, Mar:2, Avr:3, Mai:4, Jun:5, Jul:6, 'Aoû':7, Sep:8, Oct:9, Nov:10, 'Déc':11 };
 
 /* ─── In-memory data store (populated by loadAllData) ────────────── */
-const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [], library: [] };
+const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [], library: [], wishlist: [] };
 
-const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda', library:'rr_library' };
+const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda', library:'rr_library', wishlist:'rr_wishlist' };
 
 const BLOG_CATS = {
   'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)', image: '/assets/blog/annonce.png' },
@@ -77,6 +77,7 @@ let _calMonth = new Date().getMonth();
   loadHomeBlog();
   loadDynamicAgenda();
   loadDynamicLibrary();
+  loadDynamicWishlist();
   await applyStatConfig();
   initNotifWidget();
   _initBlogArticleModal();
@@ -1483,4 +1484,226 @@ function _initAgendaEntryModal() {
   document.getElementById('agenda-entry-close').addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) close(); });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WISHLIST — public section
+══════════════════════════════════════════════════════════════════ */
+
+const _WISH_SOURCES = ['BBE', 'MyLudo', 'Philibert'];
+
+async function loadDynamicWishlist() {
+  const grid = document.getElementById('wishlist-grid');
+  if (!grid) return;
+  await _fetchWishlist();
+  _renderWishlist();
+  _initWishModal();
+}
+
+async function _fetchWishlist() {
+  // _data.wishlist already pre-loaded by loadAllData via /data/wishlist.json
+  if (_data.wishlist && _data.wishlist.length) return;
+  try {
+    const res = await fetch('/api/wishlist');
+    if (res.ok) { _data.wishlist = await res.json(); return; }
+  } catch {}
+  try { _data.wishlist = JSON.parse(localStorage.getItem('rr_wishlist') || '[]'); } catch { _data.wishlist = []; }
+}
+
+function _renderWishlist() {
+  const grid = document.getElementById('wishlist-grid');
+  if (!grid) return;
+  const items = _data.wishlist || [];
+  if (!items.length) {
+    grid.innerHTML = '<p class="wish-empty">La wishlist est vide. Soyez le premier à ajouter un souhait !</p>';
+    return;
+  }
+  grid.innerHTML = items.map(w => {
+    const genre = BOOK_GENRES[w.genre] || { label: w.genre || '', color: 'blue', icon: '📚', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
+    const coverStyle = w.cover
+      ? `background:#111;background-image:url('${escHtml(w.cover)}');background-size:cover;background-position:center`
+      : `background:${escHtml(genre.gradient)}`;
+    const srcLabel = escHtml(w.source || '');
+    return `
+    <div class="wish-card" data-wish-id="${w.id}">
+      <div class="wish-cover" style="${coverStyle}">
+        ${w.cover ? '' : `<div class="wish-cover-icon">${escHtml(genre.icon)}</div>`}
+        ${w.genre ? `<span class="tag tag-${escHtml(genre.color)} wish-genre-tag">${escHtml(genre.label)}</span>` : ''}
+      </div>
+      <div class="wish-body">
+        <h3>${escHtml(w.title)}</h3>
+        ${w.author    ? `<p class="wish-author">${escHtml(w.author)}</p>` : ''}
+        ${w.publisher ? `<p class="wish-publisher">${escHtml(w.publisher)}</p>` : ''}
+        ${srcLabel    ? `<span class="wish-source-badge">${srcLabel}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _initWishModal() {
+  const overlay    = document.getElementById('wish-modal');
+  if (!overlay || overlay.dataset.bound) return;
+  overlay.dataset.bound = '1';
+
+  const btnAdd     = document.getElementById('btn-wish-add');
+  const btnClose   = document.getElementById('wish-modal-close');
+  const genreEl    = document.getElementById('wish-genre');
+  const titleInput = document.getElementById('wish-title-input');
+  const btnSearch  = document.getElementById('btn-wish-search');
+  const resultsArea = document.getElementById('wish-results-area');
+  const resultsList = document.getElementById('wish-results-list');
+  const selectedArea = document.getElementById('wish-selected-preview');
+  const previewCard  = document.getElementById('wish-preview-card');
+  const btnChange    = document.getElementById('btn-wish-change');
+  const btnConfirm   = document.getElementById('btn-wish-confirm');
+  const manualArea   = document.getElementById('wish-manual-area');
+  const manualTitle  = document.getElementById('wish-manual-title');
+  const manualAuthor = document.getElementById('wish-manual-author');
+  const manualPub    = document.getElementById('wish-manual-publisher');
+  const btnManual    = document.getElementById('btn-wish-manual-add');
+
+  let _selectedItem = null;
+
+  function openModal() {
+    genreEl.value   = '';
+    titleInput.value = '';
+    resultsArea.style.display    = 'none';
+    selectedArea.style.display   = 'none';
+    manualArea.style.display     = '';
+    resultsList.innerHTML        = '';
+    _selectedItem                = null;
+    overlay.style.display        = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    overlay.style.display        = 'none';
+    document.body.style.overflow = '';
+  }
+
+  btnAdd.addEventListener('click', openModal);
+  btnClose.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.style.display !== 'none') closeModal(); });
+
+  btnChange.addEventListener('click', () => {
+    selectedArea.style.display = 'none';
+    resultsArea.style.display  = '';
+    _selectedItem = null;
+  });
+
+  async function doSearch() {
+    const q = titleInput.value.trim();
+    if (!q) return;
+    const genre = genreEl.value;
+    const sources = (genre === 'jdr' || genre === 'jds' || genre === 'accessoire' || genre === '')
+      ? _WISH_SOURCES
+      : ['BBE', 'Philibert'];
+
+    resultsList.innerHTML = '<div class="wish-searching">Recherche en cours…</div>';
+    resultsArea.style.display  = '';
+    selectedArea.style.display = 'none';
+
+    const allResults = [];
+    await Promise.all(sources.map(async src => {
+      try {
+        const res  = await fetch(`/api/wishlist-lookup?source=${encodeURIComponent(src)}&q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (data.ok) allResults.push(...(data.results || []));
+      } catch {}
+    }));
+
+    if (!allResults.length) {
+      resultsList.innerHTML = '<p class="wish-no-results">Aucun résultat. Essayez une autre orthographe ou saisissez manuellement.</p>';
+      return;
+    }
+
+    resultsList.innerHTML = allResults.map((r, i) => {
+      const srcLbl = escHtml(r.source || '');
+      const cover  = r.cover ? `<img class="wrc-cover" src="${escHtml(r.cover)}" alt="" loading="lazy">` : `<div class="wrc-cover wrc-no-cover">📚</div>`;
+      return `
+      <div class="wish-result-card" data-idx="${i}">
+        ${cover}
+        <div class="wrc-info">
+          <strong>${escHtml(r.title)}</strong>
+          ${r.author    ? `<span>${escHtml(r.author)}</span>` : ''}
+          ${r.publisher ? `<span>${escHtml(r.publisher)}</span>` : ''}
+          ${srcLbl      ? `<span class="wrc-source">${srcLbl}</span>` : ''}
+        </div>
+        <button class="btn btn-sm btn-outline wrc-select-btn" data-idx="${i}">Choisir</button>
+      </div>`;
+    }).join('');
+
+    resultsList.querySelectorAll('.wrc-select-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        _selectedItem = allResults[idx];
+        _showPreview(_selectedItem);
+      });
+    });
+  }
+
+  btnSearch.addEventListener('click', doSearch);
+  titleInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  function _showPreview(r) {
+    const genre = BOOK_GENRES[r.genre] || { gradient: 'linear-gradient(135deg,#050b1a,#0e204d)', icon: '📚' };
+    const coverHtml = r.cover
+      ? `<img class="wish-preview-img" src="${escHtml(r.cover)}" alt="" loading="lazy">`
+      : `<div class="wish-preview-img wish-preview-no-cover" style="background:${escHtml(genre.gradient)}">${escHtml(genre.icon)}</div>`;
+    previewCard.innerHTML = `
+      ${coverHtml}
+      <div class="wish-preview-info">
+        <strong>${escHtml(r.title)}</strong>
+        ${r.author    ? `<span>${escHtml(r.author)}</span>` : ''}
+        ${r.publisher ? `<span>${escHtml(r.publisher)}</span>` : ''}
+        ${r.source    ? `<span class="wish-source-badge">${escHtml(r.source)}</span>` : ''}
+        ${r.description ? `<p class="wish-preview-desc">${escHtml(r.description.slice(0, 200))}${r.description.length > 200 ? '…' : ''}</p>` : ''}
+      </div>`;
+    selectedArea.style.display = '';
+    resultsArea.style.display  = 'none';
+  }
+
+  btnConfirm.addEventListener('click', async () => {
+    if (!_selectedItem) return;
+    const item = { ..._selectedItem, genre: genreEl.value || _selectedItem.genre || '' };
+    await _addToWishlist(item);
+    closeModal();
+  });
+
+  btnManual.addEventListener('click', async () => {
+    const title = manualTitle.value.trim();
+    if (!title) { manualTitle.focus(); return; }
+    const item = {
+      title,
+      author:    manualAuthor.value.trim(),
+      publisher: manualPub.value.trim(),
+      genre:     genreEl.value || '',
+      source:    '',
+      cover:     null,
+      description: ''
+    };
+    await _addToWishlist(item);
+    closeModal();
+  });
+}
+
+async function _addToWishlist(item) {
+  try {
+    const res = await fetch('/api/wishlist', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(item)
+    });
+    const data = await res.json();
+    if (data.ok && data.item) {
+      _data.wishlist = [...(_data.wishlist || []), data.item];
+      _renderWishlist();
+    }
+  } catch {
+    const fallback = { ...item, id: Date.now(), addedAt: new Date().toISOString() };
+    _data.wishlist = [...(_data.wishlist || []), fallback];
+    try { localStorage.setItem('rr_wishlist', JSON.stringify(_data.wishlist)); } catch {}
+    _renderWishlist();
+  }
 }

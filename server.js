@@ -611,6 +611,190 @@ async function searchBBE(q) {
   })).filter(p => p.title);
 }
 
+/* ── MyLudo search (module-level, used by library-lookup + wishlist-lookup) ── */
+async function searchMyLudo(q) {
+  function myludoRequest(method, path, headers, body) {
+    return new Promise((resolve, reject) => {
+      const opts = {
+        hostname: 'www.myludo.fr',
+        path,
+        method,
+        headers: {
+          'User-Agent':       'Mozilla/5.0 RiedRole/1.0',
+          'Accept':           'application/json, text/javascript, */*',
+          'Accept-Language':  'fr-FR,fr;q=0.9',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin':           'https://www.myludo.fr',
+          'Referer':          'https://www.myludo.fr/',
+          ...headers
+        }
+      };
+      const req2 = https.request(opts, r => {
+        const chunks = [];
+        r.on('data', c => chunks.push(c));
+        r.on('end', () => resolve({
+          status:  r.statusCode,
+          headers: r.headers,
+          body:    Buffer.concat(chunks).toString('utf8')
+        }));
+      });
+      req2.on('error', reject);
+      req2.setTimeout(10000, () => req2.destroy(new Error('timeout')));
+      if (body) req2.write(body);
+      req2.end();
+    });
+  }
+
+  const home = await myludoRequest('GET', '/', { 'Accept': 'text/html,application/xhtml+xml,*/*' });
+  const cookieRaw = [].concat(home.headers['set-cookie'] || []);
+  const sessionId = (cookieRaw.join(';').match(/MYLUDO_SESSID=([^;,\s]+)/) || [])[1] || '';
+  const csrfM     = home.body.match(/name=["']?csrf-token["']?\s+content=["']([^"']+)["']/i)
+                 || home.body.match(/content=["']([^"']+)["'][^>]*name=["']?csrf-token["']?/i)
+                 || home.body.match(/"csrf[_-]?token"\s*:\s*"([^"]+)"/i);
+  let csrf = csrfM ? csrfM[1] : '';
+  const cookie = sessionId ? `MYLUDO_SESSID=${sessionId}` : '';
+  const baseHdrs = csrf ? { 'X-Csrf-Token': csrf, 'Cookie': cookie } : { 'Cookie': cookie };
+
+  const initBody = 'type=init';
+  await myludoRequest('POST', '/views/login/datas.php', {
+    'Content-Type':   'application/x-www-form-urlencoded; charset=UTF-8',
+    'Content-Length': Buffer.byteLength(initBody),
+    ...baseHdrs
+  }, initBody);
+
+  const tokenBody = 'type=token';
+  const tokenResp = await myludoRequest('POST', '/views/login/datas.php', {
+    'Content-Type':   'application/x-www-form-urlencoded; charset=UTF-8',
+    'Content-Length': Buffer.byteLength(tokenBody),
+    ...baseHdrs
+  }, tokenBody);
+  try { const tj = JSON.parse(tokenResp.body); if (tj.token) csrf = tj.token; } catch (_) {}
+
+  const searchPath = '/views/search/datas.php?'
+    + `type=search&tab=games&words=${encodeURIComponent(q)}&page=1&order=bymagic`;
+  const searchResp = await myludoRequest('GET', searchPath, { 'X-Csrf-Token': csrf, 'Cookie': cookie });
+
+  const json  = JSON.parse(searchResp.body);
+  const items = (json.list || []).slice(0, 6);
+
+  const authHdrs = { 'X-Csrf-Token': csrf, 'Cookie': cookie };
+  const details = await Promise.all(items.map(g =>
+    g.id
+      ? myludoRequest('GET', `/views/game/datas.php?type=info&id=${g.id}`, authHdrs)
+          .then(r => JSON.parse(r.body))
+          .catch(() => ({}))
+      : Promise.resolve({})
+  ));
+
+  return items.map((g, i) => {
+    const d    = details[i] || {};
+    const desc = (d.description || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
+    const price = d.price && d.price !== '0' && d.price !== 0
+      ? `${parseFloat(d.price).toFixed(2)} €` : null;
+    const people  = d.people || {};
+    const authors = Object.values(people)
+      .filter(p => (p.roles || []).some(r => /auteur|cr[eé]ateur|designer|r[eé]dacteur/i.test(r)))
+      .map(p => Object.keys(people).find(k => people[k] === p) || '')
+      .slice(0, 2).join(', ');
+    const publisher = Object.values(people)
+      .filter(p => (p.roles || []).some(r => /[eé]diteur/i.test(r)))
+      .map((_, j) => Object.keys(people)[j] || '')
+      .slice(0, 1).join('');
+    return {
+      title:       g.title || '',
+      author:      authors,
+      publisher:   publisher,
+      year:        g.edition ? String(g.edition) : '',
+      cover:       g.image?.S300 || g.image?.S160 || g.image?.S80 || null,
+      description: desc,
+      price:       price,
+      url:         g.code ? `https://www.myludo.fr/#!/jeu/${g.code}` : null,
+      source:      'MyLudo'
+    };
+  });
+}
+
+/* ── Philibert search (module-level, used by library-lookup + wishlist-lookup) ── */
+async function searchPhilibert(q) {
+  const HASHID = 'b220561599a93dfc2d82f89bf6223e54';
+  const apiUrl = `https://eu1-search.doofinder.com/5/search?hashid=${HASHID}`
+    + `&query=${encodeURIComponent(q)}&rpp=8&lang=fr&page=1`;
+  const { status, body } = await fetchExternal(apiUrl, {
+    'Origin': 'https://www.philibertnet.com',
+    'Accept': 'application/json'
+  }, 8000);
+  if (status !== 200) return [];
+  const json  = JSON.parse(body);
+  const items = (json.results || []).filter(r => r.type === 'product').slice(0, 6);
+
+  function philibertParsePage(html) {
+    const out = { features: {}, description: '' };
+    const descM = html.match(/<div[^>]+id="product-description"[^>]*>([\s\S]*?)<div[^>]+id="product-features"/i);
+    if (descM) {
+      out.description = descM[1]
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&#?\w+;/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .replace(/^Description\s*/i, '');
+    }
+    const ulIdx = html.indexOf('product-features__list');
+    if (ulIdx !== -1) {
+      const ulStart = html.lastIndexOf('<ul', ulIdx);
+      const ulEnd   = html.indexOf('</ul>', ulIdx);
+      if (ulStart !== -1 && ulEnd !== -1) {
+        const block   = html.slice(ulStart, ulEnd + 5);
+        const liParts = block.split(/<li\b[^>]*product-features__item[^>]*>/i).slice(1);
+        for (const li of liParts) {
+          const nameM = li.match(/product-features__name[^>]*>\s*([^<]+?)\s*</i);
+          if (!nameM) continue;
+          const name   = nameM[1].trim();
+          const linked = [];
+          const re     = /product-features__value\b[^>]*>\s*<span[^>]*>\s*([^<]+?)\s*<\/span>/gi;
+          let lm;
+          while ((lm = re.exec(li)) !== null) linked.push(lm[1].trim());
+          if (linked.length) {
+            out.features[name] = linked;
+          } else {
+            const plainM = li.match(/product-features__value\b[^>]*>\s*([^<\s][^<]*?)\s*</i);
+            if (plainM) out.features[name] = [plainM[1].trim()];
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  const pages = await Promise.all(items.map(r =>
+    r.link
+      ? fetchExternal(r.link, { 'Referer': 'https://www.philibertnet.com/fr/' }, 10000)
+          .then(resp => resp.status === 200 ? philibertParsePage(resp.body) : { features: {}, description: '' })
+          .catch(() => ({ features: {}, description: '' }))
+      : Promise.resolve({ features: {}, description: '' })
+  ));
+
+  return items.map((r, i) => {
+    const { features: f, description: fullDesc } = pages[i];
+    const fallbackDesc = (r.description || r.alternate_description || '')
+      .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    return {
+      title:       r.title || '',
+      author:      (f['Création']        || []).join(', '),
+      publisher:   (f['Editeur']          || [])[0] || r.brand || '',
+      system:      (f['Système de Jeu']   || [])[0] || '',
+      tags:        f['Thème(s)']          || [],
+      year:        '',
+      cover:       r.image_link || null,
+      description: fullDesc || fallbackDesc,
+      price:       r.best_price ? `${parseFloat(r.best_price).toFixed(2)} €` : null,
+      url:         r.link || null,
+      source:      'Philibert'
+    };
+  });
+}
+
 /* ── Event date helpers ──────────────────────────────────────────── */
 const FR_MON = { Jan:0,'Fév':1,Mar:2,Avr:3,Mai:4,Jun:5,Jul:6,'Aoû':7,Sep:8,Oct:9,Nov:10,'Déc':11 };
 
@@ -1365,218 +1549,11 @@ const server = http.createServer(async (req, res) => {
         return out;
       }
 
-      async function searchMyLudo() {
-        // API réelle : /views/search/datas.php (SPA Backbone + CSRF session)
-        // Flux : GET / → cookie + csrf → POST login/init → POST login/token → GET search
-
-        function myludoRequest(method, path, headers, body) {
-          return new Promise((resolve, reject) => {
-            const opts = {
-              hostname: 'www.myludo.fr',
-              path,
-              method,
-              headers: {
-                'User-Agent':       'Mozilla/5.0 RiedRole/1.0',
-                'Accept':           'application/json, text/javascript, */*',
-                'Accept-Language':  'fr-FR,fr;q=0.9',
-                'X-Requested-With': 'XMLHttpRequest',
-                'Origin':           'https://www.myludo.fr',
-                'Referer':          'https://www.myludo.fr/',
-                ...headers
-              }
-            };
-            const req2 = https.request(opts, r => {
-              const chunks = [];
-              r.on('data', c => chunks.push(c));
-              r.on('end', () => resolve({
-                status:  r.statusCode,
-                headers: r.headers,
-                body:    Buffer.concat(chunks).toString('utf8')
-              }));
-            });
-            req2.on('error', reject);
-            req2.setTimeout(10000, () => req2.destroy(new Error('timeout')));
-            if (body) req2.write(body);
-            req2.end();
-          });
-        }
-
-        // 1. Page d'accueil → session cookie + CSRF
-        const home = await myludoRequest('GET', '/', {
-          'Accept': 'text/html,application/xhtml+xml,*/*'
-        });
-        const cookieRaw = [].concat(home.headers['set-cookie'] || []);
-        const sessionId = (cookieRaw.join(';').match(/MYLUDO_SESSID=([^;,\s]+)/) || [])[1] || '';
-        const csrfM     = home.body.match(/name=["']?csrf-token["']?\s+content=["']([^"']+)["']/i)
-                       || home.body.match(/content=["']([^"']+)["'][^>]*name=["']?csrf-token["']?/i)
-                       || home.body.match(/"csrf[_-]?token"\s*:\s*"([^"]+)"/i);
-        let csrf = csrfM ? csrfM[1] : '';
-        const cookie = sessionId ? `MYLUDO_SESSID=${sessionId}` : '';
-
-        const baseHdrs = csrf  ? { 'X-Csrf-Token': csrf, 'Cookie': cookie }
-                                : { 'Cookie': cookie };
-
-        // 2. Init session
-        const initBody = 'type=init';
-        await myludoRequest('POST', '/views/login/datas.php', {
-          'Content-Type':   'application/x-www-form-urlencoded; charset=UTF-8',
-          'Content-Length': Buffer.byteLength(initBody),
-          ...baseHdrs
-        }, initBody);
-
-        // 3. Récupérer un CSRF frais
-        const tokenBody = 'type=token';
-        const tokenResp = await myludoRequest('POST', '/views/login/datas.php', {
-          'Content-Type':   'application/x-www-form-urlencoded; charset=UTF-8',
-          'Content-Length': Buffer.byteLength(tokenBody),
-          ...baseHdrs
-        }, tokenBody);
-        try {
-          const tj = JSON.parse(tokenResp.body);
-          if (tj.token) csrf = tj.token;
-        } catch (_) {}
-
-        // 4. Recherche (sans filtre family — "jdr" filtre trop agressivement)
-        const searchPath = '/views/search/datas.php?'
-          + `type=search&tab=games&words=${encodeURIComponent(q)}&page=1&order=bymagic`;
-        const searchResp = await myludoRequest('GET', searchPath, {
-          'X-Csrf-Token': csrf,
-          'Cookie':       cookie
-        });
-
-        const json  = JSON.parse(searchResp.body);
-        const items = (json.list || []).slice(0, 6);
-
-        // 5. Détails en parallèle (description + prix) via /views/game/datas.php?type=info&id=
-        const authHdrs = { 'X-Csrf-Token': csrf, 'Cookie': cookie };
-        const details = await Promise.all(items.map(g =>
-          g.id
-            ? myludoRequest('GET', `/views/game/datas.php?type=info&id=${g.id}`, authHdrs)
-                .then(r => JSON.parse(r.body))
-                .catch(() => ({}))
-            : Promise.resolve({})
-        ));
-
-        return items.map((g, i) => {
-          const d    = details[i] || {};
-          const desc = (d.description || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
-          const price = d.price && d.price !== '0' && d.price !== 0
-            ? `${parseFloat(d.price).toFixed(2)} €`
-            : null;
-          const people  = d.people || {};
-          const authors = Object.values(people)
-            .filter(p => (p.roles || []).some(r => /auteur|cr[eé]ateur|designer|r[eé]dacteur/i.test(r)))
-            .map(p => Object.keys(people).find(k => people[k] === p) || '')
-            .slice(0, 2).join(', ');
-          const publisher = Object.values(people)
-            .filter(p => (p.roles || []).some(r => /[eé]diteur/i.test(r)))
-            .map((_, j) => Object.keys(people)[j] || '')
-            .slice(0, 1).join('');
-
-          return {
-            title:       g.title || '',
-            author:      authors,
-            publisher:   publisher,
-            year:        g.edition ? String(g.edition) : '',
-            cover:       g.image?.S300 || g.image?.S160 || g.image?.S80 || null,
-            description: desc,
-            price:       price,
-            url:         g.code ? `https://www.myludo.fr/#!/jeu/${g.code}` : null,
-            source:      'MyLudo'
-          };
-        });
-      }
-
-      async function searchPhilibert() {
-        const HASHID = 'b220561599a93dfc2d82f89bf6223e54';
-        const apiUrl = `https://eu1-search.doofinder.com/5/search?hashid=${HASHID}`
-          + `&query=${encodeURIComponent(q)}&rpp=8&lang=fr&page=1`;
-        const { status, body } = await fetchExternal(apiUrl, {
-          'Origin': 'https://www.philibertnet.com',
-          'Accept': 'application/json'
-        }, 8000);
-        if (status !== 200) return [];
-        const json  = JSON.parse(body);
-        const items = (json.results || []).filter(r => r.type === 'product').slice(0, 6);
-
-        function philibertParsePage(html) {
-          const out = { features: {}, description: '' };
-
-          // Description complète : entre #product-description et #product-features
-          const descM = html.match(/<div[^>]+id="product-description"[^>]*>([\s\S]*?)<div[^>]+id="product-features"/i);
-          if (descM) {
-            out.description = descM[1]
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&#?\w+;/g, ' ')
-              .replace(/\s{2,}/g, ' ')
-              .trim()
-              .replace(/^Description\s*/i, '');
-          }
-
-          // Fiche technique : product-features__list
-          const ulIdx = html.indexOf('product-features__list');
-          if (ulIdx !== -1) {
-            const ulStart = html.lastIndexOf('<ul', ulIdx);
-            const ulEnd   = html.indexOf('</ul>', ulIdx);
-            if (ulStart !== -1 && ulEnd !== -1) {
-              const block   = html.slice(ulStart, ulEnd + 5);
-              const liParts = block.split(/<li\b[^>]*product-features__item[^>]*>/i).slice(1);
-              for (const li of liParts) {
-                const nameM = li.match(/product-features__name[^>]*>\s*([^<]+?)\s*</i);
-                if (!nameM) continue;
-                const name   = nameM[1].trim();
-                const linked = [];
-                const re     = /product-features__value\b[^>]*>\s*<span[^>]*>\s*([^<]+?)\s*<\/span>/gi;
-                let lm;
-                while ((lm = re.exec(li)) !== null) linked.push(lm[1].trim());
-                if (linked.length) {
-                  out.features[name] = linked;
-                } else {
-                  const plainM = li.match(/product-features__value\b[^>]*>\s*([^<\s][^<]*?)\s*</i);
-                  if (plainM) out.features[name] = [plainM[1].trim()];
-                }
-              }
-            }
-          }
-          return out;
-        }
-
-        // Fetch fiches produit en parallèle (description + features)
-        const pages = await Promise.all(items.map(r =>
-          r.link
-            ? fetchExternal(r.link, { 'Referer': 'https://www.philibertnet.com/fr/' }, 10000)
-                .then(resp => resp.status === 200 ? philibertParsePage(resp.body) : { features: {}, description: '' })
-                .catch(() => ({ features: {}, description: '' }))
-            : Promise.resolve({ features: {}, description: '' })
-        ));
-
-        return items.map((r, i) => {
-          const { features: f, description: fullDesc } = pages[i];
-          const fallbackDesc = (r.description || r.alternate_description || '')
-            .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-          return {
-            title:       r.title || '',
-            author:      (f['Création']        || []).join(', '),
-            publisher:   (f['Editeur']          || [])[0] || r.brand || '',
-            system:      (f['Système de Jeu']   || [])[0] || '',
-            tags:        f['Thème(s)']          || [],
-            year:        '',
-            cover:       r.image_link || null,
-            description: fullDesc || fallbackDesc,
-            price:       r.best_price ? `${parseFloat(r.best_price).toFixed(2)} €` : null,
-            url:         r.link || null,
-            source:      'Philibert'
-          };
-        });
-      }
-
       const sourceMap = {
         'OpenLibrary':  () => searchOL(),
         'BoardGameGeek':() => searchBGG(),
-        'MyLudo':       () => searchMyLudo(),
-        'Philibert':    () => searchPhilibert(),
+        'MyLudo':       () => searchMyLudo(q),
+        'Philibert':    () => searchPhilibert(q),
         'BnF':          () => searchBnF(q),
         'IGDB':         () => searchIGDB(q),
         'BBE':          () => searchBBE(q)
@@ -1590,6 +1567,101 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, JSON_HDR);
       res.end(JSON.stringify({ ok: true, source, results }));
+      return;
+    }
+
+    // ── GET /api/wishlist-lookup ─────────────────────────────────
+    // Public (no auth). Recherche un ouvrage via BBE, MyLudo ou Philibert.
+    if (pathname === '/api/wishlist-lookup' && req.method === 'GET') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+      const q      = (u.searchParams.get('q')      || '').trim();
+      const source = (u.searchParams.get('source') || '').trim();
+
+      if (!q || !source) {
+        res.writeHead(200, JSON_HDR);
+        res.end(JSON.stringify({ ok: true, source, results: [] }));
+        return;
+      }
+
+      const wishlistSourceMap = {
+        'BBE':       () => searchBBE(q),
+        'MyLudo':    () => searchMyLudo(q),
+        'Philibert': () => searchPhilibert(q)
+      };
+
+      const fn = wishlistSourceMap[source];
+      const results = fn
+        ? await fn().catch(e => { console.error(`[wishlist-lookup/${source}]`, e.message); return []; })
+        : [];
+
+      res.writeHead(200, JSON_HDR);
+      res.end(JSON.stringify({ ok: true, source, results }));
+      return;
+    }
+
+    // ── GET /api/wishlist ─────────────────────────────────────────
+    if (pathname === '/api/wishlist' && req.method === 'GET') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+      let items = [];
+      try { items = JSON.parse(fs.readFileSync(path.join(DATA, 'wishlist.json'), 'utf8')); } catch {}
+      res.writeHead(200, JSON_HDR);
+      res.end(JSON.stringify(items));
+      return;
+    }
+
+    // ── POST /api/wishlist ────────────────────────────────────────
+    if (pathname === '/api/wishlist' && req.method === 'POST') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+      try {
+        const body = JSON.parse(await readBody(req));
+        const title = String(body.title || '').trim().slice(0, 200);
+        if (!title) {
+          res.writeHead(400, JSON_HDR);
+          res.end(JSON.stringify({ ok: false, error: 'Titre requis.' }));
+          return;
+        }
+        const wishFile = path.join(DATA, 'wishlist.json');
+        let items = [];
+        try { items = JSON.parse(fs.readFileSync(wishFile, 'utf8')); } catch {}
+        const item = {
+          id:          Date.now(),
+          title,
+          author:      String(body.author      || '').trim().slice(0, 200),
+          genre:       String(body.genre       || '').trim().slice(0, 50),
+          publisher:   String(body.publisher   || '').trim().slice(0, 200),
+          year:        String(body.year        || '').trim().slice(0, 10),
+          cover:       typeof body.cover === 'string' ? body.cover.slice(0, 500000) : null,
+          description: String(body.description || '').trim().slice(0, 2000),
+          source:      String(body.source      || '').trim().slice(0, 50),
+          url:         String(body.url         || '').trim().slice(0, 500),
+          addedAt:     new Date().toISOString()
+        };
+        items.push(item);
+        fs.writeFileSync(wishFile, JSON.stringify(items, null, 2), 'utf8');
+        res.writeHead(200, JSON_HDR);
+        res.end(JSON.stringify({ ok: true, item }));
+      } catch (err) {
+        console.error('[wishlist/POST]', err.message);
+        res.writeHead(500, JSON_HDR);
+        res.end(JSON.stringify({ ok: false, error: 'Erreur serveur.' }));
+      }
+      return;
+    }
+
+    // ── DELETE /api/wishlist/:id ──────────────────────────────────
+    const wishDelM = pathname.match(/^\/api\/wishlist\/(\d+)$/);
+    if (wishDelM && req.method === 'DELETE') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+      const session = getSession(req);
+      if (!session) { res.writeHead(403, JSON_HDR); res.end(JSON.stringify({ ok: false })); return; }
+      const id = parseInt(wishDelM[1], 10);
+      const wishFile = path.join(DATA, 'wishlist.json');
+      let items = [];
+      try { items = JSON.parse(fs.readFileSync(wishFile, 'utf8')); } catch {}
+      items = items.filter(it => it.id !== id);
+      fs.writeFileSync(wishFile, JSON.stringify(items, null, 2), 'utf8');
+      res.writeHead(200, JSON_HDR);
+      res.end(JSON.stringify({ ok: true }));
       return;
     }
 
@@ -1785,10 +1857,33 @@ const server = http.createServer(async (req, res) => {
       const session = getSession(req);
       if (!session || !session.permissions.includes('site')) { res.writeHead(403); res.end('Forbidden'); return; }
       try {
+        // Mapping section → fichiers JSON
+        const SECTION_FILES = {
+          agenda:        ['agenda.json'],
+          library:       ['library.json'],
+          blog:          ['blog.json'],
+          events:        ['events.json', 'registrations.json', 'tables.json'],
+          games:         ['games.json'],
+          team:          ['team.json'],
+          notifications: ['subscriptions.json', 'notif_log.json', 'event_notif_subs.json'],
+          wishlist:      ['wishlist.json'],
+        };
+
+        const rawSections = (u.searchParams.get('sections') || '').trim();
+        let wanted; // Set of file names to include
+        if (rawSections) {
+          const sections = rawSections.split(',').map(s => s.trim()).filter(Boolean);
+          wanted = new Set(sections.flatMap(s => SECTION_FILES[s] || []));
+        } else {
+          // Aucune sélection → tout inclure
+          wanted = new Set(Object.values(SECTION_FILES).flat());
+        }
+
         const entries = await fs.promises.readdir(DATA);
         const files = [];
         for (const entry of entries) {
           if (!entry.endsWith('.json')) continue;
+          if (!wanted.has(entry)) continue;
           try {
             const content = await fs.promises.readFile(path.join(DATA, entry));
             files.push({ name: entry, data: content });

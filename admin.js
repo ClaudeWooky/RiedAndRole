@@ -3099,11 +3099,35 @@ function bindBackupRestore() {
   const inputRestore = document.getElementById('input-restore-data');
 
   if (btnBackup) {
-    btnBackup.addEventListener('click', async () => {
+    // Initialise la popup de sélection (une seule fois)
+    const overlay    = document.getElementById('backup-select-overlay');
+    const okBtn      = document.getElementById('backup-select-ok');
+    const cancelBtn  = document.getElementById('backup-select-cancel');
+    const allBtn     = document.getElementById('backup-select-all');
+    const noneBtn    = document.getElementById('backup-deselect-all');
+    const checkboxes = () => overlay.querySelectorAll('input[name="backup-item"]');
+
+    allBtn.addEventListener('click',  () => checkboxes().forEach(cb => cb.checked = true));
+    noneBtn.addEventListener('click', () => checkboxes().forEach(cb => cb.checked = false));
+
+    function closePopup() { overlay.setAttribute('hidden', ''); }
+    cancelBtn.addEventListener('click', closePopup);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closePopup(); });
+
+    btnBackup.addEventListener('click', () => {
+      overlay.removeAttribute('hidden');
+    });
+
+    okBtn.addEventListener('click', async () => {
+      const selected = [...checkboxes()].filter(cb => cb.checked).map(cb => cb.value);
+      if (!selected.length) { showToast('Aucune section sélectionnée.', true); return; }
+
+      closePopup();
       btnBackup.disabled = true;
       btnBackup.textContent = '⏳ Préparation…';
       try {
-        const res = await fetch('/api/backup-data', {
+        const params = 'sections=' + encodeURIComponent(selected.join(','));
+        const res = await fetch('/api/backup-data?' + params, {
           headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem(TOKEN_KEY) || '') }
         });
         if (!res.ok) throw new Error('Erreur serveur ' + res.status);

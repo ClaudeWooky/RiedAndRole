@@ -1259,6 +1259,77 @@ hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 
   align-items: center;
 }
 
+/* Popup sélection sauvegarde */
+.backup-select-card {
+  max-width: 460px;
+  width: 100%;
+  padding: 1.75rem 2rem;
+}
+.backup-select-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: var(--text-light);
+  margin: 0 0 .5rem;
+}
+.backup-select-hint {
+  font-size: .88rem;
+  color: var(--text-muted);
+  margin: 0 0 1.2rem;
+}
+.backup-select-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .55rem .75rem;
+  margin-bottom: 1.5rem;
+}
+.backup-cb-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+  color: var(--text);
+  cursor: pointer;
+  padding: .4rem .6rem;
+  border-radius: 4px;
+  transition: background .15s;
+}
+.backup-cb-row:hover { background: rgba(255,255,255,.04); }
+.backup-cb-row input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.backup-select-footer {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
+}
+.btn-text-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: .82rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-family: inherit;
+}
+.btn-text-link:hover { color: var(--accent-hover, #f0b030); }
+#backup-select-ok {
+  background: rgba(232,160,32,.18);
+  border-color: rgba(232,160,32,.5);
+  color: var(--accent);
+}
+#backup-select-ok:hover {
+  background: rgba(232,160,32,.35);
+  border-color: var(--accent);
+}
+
 /* ─── Account management ─────────────────────────────────────────── */
 .section-title-bar--sub {
   border-top: 1px solid var(--border);
