@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindLogout();
   bindSectionNav();
   bindGameCategoryAutoFill();
+  bindMyLudoImport();
   bindMemberTypeToggle();
   bindPhotoInput();
   bindGameImageInput();
@@ -929,6 +930,82 @@ function bindGameCategoryAutoFill() {
   // tag/color/icon are now fully derived from category at save time — nothing to bind
 }
 
+/* ─── Import jeu depuis MyLudo ───────────────────────────────────── */
+function bindMyLudoImport() {
+  const btn    = document.getElementById('myludo-import-btn');
+  const input  = document.getElementById('myludo-url-input');
+  const status = document.getElementById('myludo-import-status');
+  if (!btn || !input) return;
+
+  btn.addEventListener('click', async () => {
+    const url = input.value.trim();
+    if (!url) { showToast('Entrez une URL MyLudo', true); return; }
+
+    btn.disabled    = true;
+    btn.textContent = '⏳ Chargement…';
+    status.style.display = 'none';
+
+    try {
+      const res  = await fetch('/api/scrape-myludo?url=' + encodeURIComponent(url));
+      const data = await res.json();
+
+      if (!data.ok) {
+        status.style.display = 'block';
+        status.style.color   = '#c0392b';
+        status.textContent   = data.error || 'Échec de l\'import.';
+        return;
+      }
+
+      const g    = data.game;
+      const form = document.getElementById('form-games');
+
+      // Titre
+      const titleInput = form.querySelector('[name="title"]');
+      if (titleInput && g.title) titleInput.value = g.title;
+
+      // Description
+      const descInput = form.querySelector('[name="description"]');
+      if (descInput && g.description) descInput.value = g.description;
+
+      // Badges (joueurs, durée, âge, auteurs)
+      const badgesInput = form.querySelector('[name="badges"]');
+      if (badgesInput) {
+        const parts = [g.nbPlayers, g.duration, g.age, g.designers]
+          .filter(Boolean);
+        if (parts.length) badgesInput.value = parts.join(', ');
+      }
+
+      // Image
+      if (g.coverBase64) {
+        currentGameImageData = g.coverBase64;
+        gameImageCleared     = false;
+        const preview = document.getElementById('game-image-preview');
+        const img     = document.getElementById('game-image-img');
+        if (preview && img) {
+          img.src              = g.coverBase64;
+          preview.style.display = 'block';
+        }
+        // Vider l'input file (il ne reflète pas la donnée base64 mais on réinitialise)
+        const fileInput = document.getElementById('game-image-input');
+        if (fileInput) fileInput.value = '';
+      }
+
+      status.style.display = 'block';
+      status.style.color   = '#27ae60';
+      status.textContent   = `✓ « ${g.title || 'Jeu'} » importé — vérifiez et complétez les champs manquants.`;
+      input.value = '';
+
+    } catch (err) {
+      status.style.display = 'block';
+      status.style.color   = '#c0392b';
+      status.textContent   = 'Erreur réseau : ' + err.message;
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '🔗 Importer les infos';
+    }
+  });
+}
+
 /* ─── Populate games multi-select from catalog ───────────────────── */
 function populateGamesSelect(selectedGames) {
   const sel = document.getElementById('games-select');
@@ -1664,10 +1741,11 @@ function renderLibrary() {
     <div class="admin-item">
       <div class="admin-item-info">
         <div class="admin-item-title">${esc(genre.icon)} ${esc(item.title)}</div>
-        <div class="admin-item-meta">${esc(item.author || '—')}${item.year ? ' · ' + esc(item.year) : ''}</div>
+        <div class="admin-item-meta">${esc(item.author || '—')}${item.year ? ' · ' + esc(item.year) : ''}${item.price ? ' · 💶 ' + esc(item.price) : ''}</div>
         <div class="admin-item-badges">
           <span class="admin-item-badge badge-${esc(genre.color)}">${esc(genre.label)}</span>
           ${stars ? `<span class="admin-item-badge badge-yellow">${esc(stars)}</span>` : ''}
+          ${item.source ? `<span class="lib-source-vignette">${esc(_BBE_SOURCE_LABELS[item.source] || item.source)}</span>` : ''}
         </div>
       </div>
       <div class="admin-item-actions">
@@ -1691,6 +1769,7 @@ function populateLibraryForm(item) {
   const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val ?? ''; };
   set('title', item.title);
   set('genre', item.genre);
+  _updateLibSources(item.genre);
   const formTitle = document.getElementById('library-form-title');
   if (formTitle) formTitle.textContent = "Modifier l'ouvrage";
   const lookupBtn = document.getElementById('lib-lookup-btn');
@@ -1711,6 +1790,7 @@ function cancelLibraryEdit() {
   editingLibraryId = null;
   const form = document.getElementById('form-library');
   form.reset();
+  _updateLibSources('');
   const formTitle = document.getElementById('library-form-title');
   if (formTitle) formTitle.textContent = 'Nouvel ouvrage';
   const lookupBtn = document.getElementById('lib-lookup-btn');
@@ -1740,11 +1820,7 @@ async function _libraryLookup() {
   btn.innerHTML = '⌛ Recherche…';
   _openLibLookupPopup(genre);
 
-  const useOL   = ['roman', 'bd', 'manga', 'artbook'].includes(genre);
-  const useBBE  = ['jdr', 'jds'].includes(genre);
-  const byGenre = useBBE ? ['BBE', 'BoardGameGeek', 'BnF', 'IGDB']
-                : useOL  ? ['OpenLibrary', 'BnF']
-                :           ['BoardGameGeek', 'BnF', 'IGDB'];
+  const byGenre = _LIB_GENRE_SOURCES[genre] || [];
   const checked = [...document.querySelectorAll('#lib-sources-group input[name="src"]:checked')].map(cb => cb.value);
   const sources = byGenre.filter(s => checked.includes(s));
   if (!sources.length) { btn.innerHTML = '&#128269; Rechercher'; return; }
@@ -1772,9 +1848,11 @@ async function _libraryLookup() {
 const _BBE_SOURCE_LABELS = {
   'OpenLibrary':       '📖 Open Library',
   'BoardGameGeek':     '🎲 Board Game Geek',
+  'MyLudo':            '🎯 MyLudo',
+  'Philibert':         '🛒 Philibert',
   'BnF':               '🇫🇷 BnF — Bibliothèque nationale de France',
   'IGDB':              '🎮 IGDB',
-  'BBE': '🕷️ Black Book Éditions'
+  'BBE':               '🕷️ Black Book Éditions'
 };
 
 function _openLibLookupPopup(genre) {
@@ -1805,11 +1883,7 @@ function _openLibLookupPopup(genre) {
   overlay.hidden = false;
   document.body.style.overflow = 'hidden';
 
-  const useOL   = ['roman', 'bd', 'manga', 'artbook'].includes(genre);
-  const useBBE  = ['jdr', 'jds'].includes(genre);
-  const byGenre = useBBE ? ['BBE', 'BoardGameGeek', 'BnF', 'IGDB']
-                : useOL  ? ['OpenLibrary', 'BnF']
-                :           ['BoardGameGeek', 'BnF', 'IGDB'];
+  const byGenre = _LIB_GENRE_SOURCES[genre] || [];
   const checked = [...document.querySelectorAll('#lib-sources-group input[name="src"]:checked')].map(cb => cb.value);
   const sources = byGenre.filter(s => checked.includes(s));
 
@@ -1827,6 +1901,8 @@ function _libFallbackUrl(r) {
   switch (r.source) {
     case 'OpenLibrary':    return `https://openlibrary.org/search?title=${q}`;
     case 'BoardGameGeek':  return `https://boardgamegeek.com/search?q=${q}&objecttype=boardgame`;
+    case 'MyLudo':         return `https://www.myludo.fr/#!/recherche?q=${q}`;
+    case 'Philibert':      return `https://www.philibertnet.com/fr/recherche?q=${q}`;
     case 'BnF':            return `https://catalogue.bnf.fr/rechercher.do?index=MOTS&motRecherche=${q}`;
     case 'IGDB':           return `https://www.igdb.com/search?type=1&q=${q}`;
     case 'BBE':            return `https://shop.black-book-editions.fr/catalogue/recherche?nameLike=${q}`;
@@ -1861,6 +1937,7 @@ function _updateLibLookupSource(source, results) {
         <div class="lib-lookup-card-title">${esc(r.title)}</div>
         ${r.author    ? `<div class="lib-lookup-card-meta">✍️ ${esc(r.author)}</div>` : ''}
         ${r.year || r.publisher ? `<div class="lib-lookup-card-meta">${[r.year, r.publisher].filter(Boolean).map(s => esc(s)).join(' · ')}</div>` : ''}
+        ${r.price ? `<div class="lib-lookup-card-meta">💶 ${esc(r.price)}</div>` : ''}
         ${r.description ? `<div class="lib-lookup-card-desc">${esc(r.description)}</div>` : ''}
       </div>
       <button class="lib-lookup-card-add" data-idx="${i}" title="Ajouter à la bibliothèque" type="button">＋</button>
@@ -1922,9 +1999,13 @@ function _applyLibraryLookupResult(r) {
         title:       r.title       || items[idx].title,
         author:      r.author      || '',
         publisher:   r.publisher   || '',
+        system:      r.system      || items[idx].system || '',
         year:        r.year        || '',
         description: r.description || '',
         cover:       r.cover       ?? items[idx].cover,
+        price:       r.price       || items[idx].price || '',
+        tags:        r.tags?.length ? r.tags : (items[idx].tags || []),
+        source:      r.source      || items[idx].source || '',
       };
       saveData(KEYS.library, items);
       showToast('Ouvrage modifié.');
@@ -1936,12 +2017,15 @@ function _applyLibraryLookupResult(r) {
       title:       r.title       || '',
       author:      r.author      || '',
       genre,
-      system:      '',
+      system:      r.system      || '',
       publisher:   r.publisher   || '',
       year:        r.year        || '',
       description: r.description || '',
       rating:      0,
       cover:       r.cover       || null,
+      price:       r.price       || '',
+      tags:        r.tags        || [],
+      source:      r.source      || '',
     });
     showToast('Ouvrage ajouté !');
     const titleEl = document.getElementById('lib-title-input');
@@ -1950,10 +2034,49 @@ function _applyLibraryLookupResult(r) {
   renderLibrary();
 }
 
+const _LIB_SOURCE_DEFS = {
+  'BBE':          { label: '🕷️ Black Book Éditions', checked: true  },
+  'MyLudo':       { label: '🎯 MyLudo',               checked: true  },
+  'Philibert':    { label: '🛒 Philibert',            checked: true  },
+  'BoardGameGeek':{ label: '🎲 Board Game Geek',      checked: false },
+  'BnF':          { label: '🇫🇷 BnF',                 checked: false },
+  'IGDB':         { label: '🎮 IGDB',                 checked: false },
+  'OpenLibrary':  { label: '📖 Open Library',         checked: false },
+};
+
+const _LIB_GENRE_SOURCES = {
+  jdr:        ['BBE', 'MyLudo', 'Philibert', 'BoardGameGeek', 'BnF', 'IGDB'],
+  jds:        ['BBE', 'MyLudo', 'Philibert', 'BoardGameGeek', 'BnF', 'IGDB'],
+  roman:      ['OpenLibrary', 'BnF'],
+  bd:         ['OpenLibrary', 'BnF'],
+  manga:      ['OpenLibrary', 'BnF'],
+  artbook:    ['OpenLibrary', 'BnF'],
+  accessoire: ['BBE', 'Philibert', 'BoardGameGeek', 'BnF'],
+  autre:      ['Philibert', 'BoardGameGeek', 'BnF', 'IGDB', 'OpenLibrary'],
+};
+
+function _updateLibSources(genre) {
+  const group = document.getElementById('lib-sources-group');
+  const box   = document.getElementById('lib-sources-checkboxes');
+  if (!group || !box) return;
+  if (!genre) { group.style.display = 'none'; box.innerHTML = ''; return; }
+  const sources = _LIB_GENRE_SOURCES[genre] || ['BnF', 'OpenLibrary', 'BoardGameGeek'];
+  box.innerHTML = sources.map(src => {
+    const def = _LIB_SOURCE_DEFS[src] || { label: src, checked: false };
+    return `<label class="lib-source-cb"><input type="checkbox" name="src" value="${src}"${def.checked ? ' checked' : ''}> ${def.label}</label>`;
+  }).join('');
+  group.style.display = '';
+}
+
 function bindLibraryForm() {
   const form      = document.getElementById('form-library');
   const lookupBtn = document.getElementById('lib-lookup-btn');
   if (!form || !lookupBtn) return;
+  const genreEl = form.querySelector('[name="genre"]');
+  if (genreEl) {
+    genreEl.addEventListener('change', () => _updateLibSources(genreEl.value));
+    _updateLibSources(genreEl.value);
+  }
   lookupBtn.addEventListener('click', _libraryLookup);
   form.addEventListener('submit', e => e.preventDefault()); // bloquer soumission accidentelle
 }

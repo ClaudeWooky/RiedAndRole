@@ -236,6 +236,18 @@
 
           <div class="admin-form-panel">
             <div class="panel-header">
+              <h3>Importer depuis MyLudo</h3>
+            </div>
+            <div id="myludo-import-box" style="padding:.8rem 0 1.2rem;">
+              <div class="form-group" style="margin-bottom:.6rem;">
+                <label>URL de la fiche MyLudo</label>
+                <input type="url" id="myludo-url-input" placeholder="https://www.myludo.fr/#!/jeu/nom-du-jeu-12345" style="width:100%;" />
+              </div>
+              <button type="button" id="myludo-import-btn" class="btn btn-outline btn-full">&#128279; Importer les infos</button>
+              <div id="myludo-import-status" style="margin-top:.5rem;font-size:.85rem;display:none;"></div>
+            </div>
+
+            <div class="panel-header" style="margin-top:.5rem;">
               <h3>Ajouter un jeu</h3>
             </div>
             <form id="form-games" novalidate>
@@ -477,15 +489,9 @@
                 <label>Titre *</label>
                 <input type="text" name="title" id="lib-title-input" placeholder="Titre du livre ou produit" required autocomplete="off" />
               </div>
-              <div class="form-group" id="lib-sources-group">
+              <div class="form-group" id="lib-sources-group" style="display:none">
                 <label>Sources</label>
-                <div class="lib-sources-checkboxes">
-                  <label class="lib-source-cb"><input type="checkbox" name="src" value="BBE" checked> &#128375;&#65039; Black Book Éditions</label>
-                  <label class="lib-source-cb"><input type="checkbox" name="src" value="BoardGameGeek" checked> &#127922; Board Game Geek</label>
-                  <label class="lib-source-cb"><input type="checkbox" name="src" value="BnF" checked> &#127467;&#127479; BnF</label>
-                  <label class="lib-source-cb"><input type="checkbox" name="src" value="IGDB" checked> &#127918; IGDB</label>
-                  <label class="lib-source-cb"><input type="checkbox" name="src" value="OpenLibrary" checked> &#128218; Open Library</label>
-                </div>
+                <div id="lib-sources-checkboxes" class="lib-sources-checkboxes"></div>
               </div>
               <button type="button" id="lib-lookup-btn" class="btn btn-primary btn-full">&#128269; Rechercher</button>
             </form>

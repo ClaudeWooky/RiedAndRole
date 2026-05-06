@@ -619,6 +619,12 @@ function _openBookModal(id) {
   if (b.year)      meta.push(b.year);
   document.getElementById('bm-meta').textContent   = meta.join('  ·  ');
   document.getElementById('bm-stars').innerHTML    = _renderBookStars(b.rating || 0);
+  const tagsEl = document.getElementById('bm-tags');
+  if (tagsEl) {
+    const tags = Array.isArray(b.tags) ? b.tags : [];
+    tagsEl.innerHTML     = tags.map(t => `<span class="bm-tag">${escHtml(t)}</span>`).join('');
+    tagsEl.style.display = tags.length ? '' : 'none';
+  }
   const descEl = document.getElementById('bm-desc');
   descEl.textContent  = b.description || '';
   descEl.style.display = b.description ? '' : 'none';
