@@ -1539,3 +1539,79 @@ hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 
   opacity: .5;
   cursor: not-allowed;
 }
+
+/* ─── Comptabilité ───────────────────────────────────────────────── */
+.compta-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 640px) {
+  .compta-summary { grid-template-columns: 1fr; }
+}
+
+.compta-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  text-align: center;
+}
+.compta-card-label {
+  font-size: .78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: .35rem;
+}
+.compta-card-value {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.compta-card--positive .compta-card-value { color: var(--green); }
+.compta-card--negative .compta-card-value { color: var(--red); }
+.compta-card--recettes  .compta-card-value { color: var(--green); }
+.compta-card--depenses  .compta-card-value { color: var(--red); }
+.compta-card--solde { border-color: var(--accent); }
+
+.compta-filter-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.compta-filter-bar .form-group { min-width: 160px; }
+
+.compta-badge {
+  display: inline-block;
+  padding: .15rem .55rem;
+  border-radius: 3px;
+  font-size: .72rem;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.compta-badge--recette {
+  background: rgba(34,197,94,.18);
+  color: #86efac;
+  border: 1px solid rgba(34,197,94,.3);
+}
+.compta-badge--depense {
+  background: rgba(239,68,68,.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.3);
+}
+
+.compta-montant {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.compta-montant--recette { color: var(--green); }
+.compta-montant--depense { color: var(--red); }

@@ -290,7 +290,7 @@ function verifyPw(password, storedHash, salt) {
 
 /* ── Accounts helpers ────────────────────────────────────────────── */
 const ACCOUNTS_FILE = path.join(DATA, 'accounts.json');
-const ALL_PERMS = ['evenements', 'agenda', 'jeux', 'equipe', 'blog', 'bibliotheque', 'site'];
+const ALL_PERMS = ['evenements', 'agenda', 'jeux', 'equipe', 'blog', 'bibliotheque', 'comptabilite', 'site'];
 
 function loadAccounts() {
   try { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')); }
@@ -1867,6 +1867,7 @@ const server = http.createServer(async (req, res) => {
           team:          ['team.json'],
           notifications: ['subscriptions.json', 'notif_log.json', 'event_notif_subs.json'],
           wishlist:      ['wishlist.json'],
+          comptabilite:  ['comptabilite.json'],
         };
 
         const rawSections = (u.searchParams.get('sections') || '').trim();

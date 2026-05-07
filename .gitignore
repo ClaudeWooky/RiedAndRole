@@ -1,5 +1,8 @@
 # Credentials — ne jamais versionner
 config.json
 
+# Données générées automatiquement
+data/analytics.json
+
 # Dépendances
 node_modules/

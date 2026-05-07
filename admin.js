@@ -9,7 +9,7 @@ const SESSION_KEY = 'rr_admin_auth';
 const TOKEN_KEY   = 'rr_admin_token';
 const PERMS_KEY   = 'rr_admin_perms';
 
-const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', bibliotheque: 'bibliotheque', agenda: 'agenda', site: 'site' };
+const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', bibliotheque: 'bibliotheque', comptabilite: 'comptabilite', agenda: 'agenda', site: 'site' };
 
 let editingTeamId    = null;
 let editingEventId   = null;
@@ -18,6 +18,7 @@ let editingBlogId      = null;
 let editingLibraryId   = null;
 let editingAgendaId  = null;
 let editingAccountId = null;
+let editingComptaId  = null;
 let currentPhotoData     = null;
 let currentGameImageData = null;
 let gameImageCleared     = false;
@@ -40,7 +41,8 @@ const KEYS = {
   subs:      'subscriptions',
   evtnotif:  'event_notif_subs',
   notif:     'notif_log',
-  analytics: 'analytics'
+  analytics: 'analytics',
+  compta:    'comptabilite'
 };
 
 const BLOG_CATS = {
@@ -99,6 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindForms();
   bindBlogForm();
   bindLibraryForm();
+  bindComptaForm();
   bindAgendaForm();
   bindSiteForm();
   bindAccountForm();
@@ -113,7 +116,7 @@ function checkAuth() {
   if (sessionStorage.getItem(SESSION_KEY) === 'true') {
     showShell();
     const perms = JSON.parse(sessionStorage.getItem(PERMS_KEY) || 'null');
-    applyPermissions(perms || ['evenements','agenda','jeux','equipe','blog','bibliotheque','site']);
+    applyPermissions(perms || ['evenements','agenda','jeux','equipe','blog','bibliotheque','comptabilite','site']);
   }
 }
 
@@ -1055,6 +1058,7 @@ function renderAll() {
   renderTeam();
   renderBlog();
   renderLibrary();
+  renderCompta();
   renderAgenda();
   renderSite();
 }
@@ -3094,6 +3098,198 @@ function cancelAgendaEdit() {
 }
 
 /* ─── Backup / Restore ───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   COMPTABILITÉ
+═══════════════════════════════════════════════════════════════════ */
+const COMPTA_CAT_LABELS = {
+  cotisation:       'Cotisations',
+  don:              'Dons / Mécénat',
+  subvention:       'Subventions',
+  evenement:        'Événements',
+  vente:            'Ventes',
+  'autre-recette':  'Autre recette',
+  materiel:         'Matériel / Jeux',
+  local:            'Local / Loyer',
+  fournitures:      'Fournitures',
+  communication:    'Communication',
+  'frais-evenement':'Frais événement',
+  'autre-depense':  'Autre dépense',
+};
+
+function _comptaFilteredItems() {
+  const yearSel = document.getElementById('compta-filter-year');
+  const typeSel = document.getElementById('compta-filter-type');
+  const year    = yearSel ? yearSel.value : '';
+  const type    = typeSel ? typeSel.value : '';
+  return getData(KEYS.compta)
+    .slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .filter(e => (!year || (e.date || '').startsWith(year)) && (!type || e.type === type));
+}
+
+function _populateYearFilter() {
+  const sel = document.getElementById('compta-filter-year');
+  if (!sel) return;
+  const years = [...new Set(getData(KEYS.compta).map(e => (e.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Toutes les années</option>' +
+    years.map(y => `<option value="${y}"${y === current ? ' selected' : ''}>${y}</option>`).join('');
+}
+
+function _renderComptaSummary(items) {
+  const el = document.getElementById('compta-summary');
+  if (!el) return;
+  const recettes = items.filter(e => e.type === 'recette').reduce((s, e) => s + (parseFloat(e.montant) || 0), 0);
+  const depenses = items.filter(e => e.type === 'depense').reduce((s, e) => s + (parseFloat(e.montant) || 0), 0);
+  const solde    = recettes - depenses;
+  const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  el.innerHTML = `
+    <div class="compta-card compta-card--solde ${solde >= 0 ? 'compta-card--positive' : 'compta-card--negative'}">
+      <div class="compta-card-label">Solde</div>
+      <div class="compta-card-value">${solde >= 0 ? '+' : ''}${fmt(solde)} €</div>
+    </div>
+    <div class="compta-card compta-card--recettes">
+      <div class="compta-card-label">Total recettes</div>
+      <div class="compta-card-value">+${fmt(recettes)} €</div>
+    </div>
+    <div class="compta-card compta-card--depenses">
+      <div class="compta-card-label">Total dépenses</div>
+      <div class="compta-card-value">-${fmt(depenses)} €</div>
+    </div>`;
+}
+
+function renderCompta() {
+  _populateYearFilter();
+  const items  = _comptaFilteredItems();
+  const list   = document.getElementById('list-compta');
+  const count  = document.getElementById('count-compta');
+  if (!list) return;
+  count.textContent = items.length;
+  _renderComptaSummary(items);
+
+  if (!items.length) {
+    list.innerHTML = '<p class="empty-msg">Aucune écriture enregistrée.</p>';
+    return;
+  }
+
+  const fmt = n => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  list.innerHTML = items.map(item => {
+    const isRec   = item.type === 'recette';
+    const sign    = isRec ? '+' : '-';
+    const badgeCls = isRec ? 'compta-badge compta-badge--recette' : 'compta-badge compta-badge--depense';
+    const badgeTxt = isRec ? 'Recette' : 'Dépense';
+    const catLabel = COMPTA_CAT_LABELS[item.categorie] || esc(item.categorie || '');
+    return `
+    <div class="admin-list-item">
+      <div class="admin-item-header" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <span class="${badgeCls}">${badgeTxt}</span>
+        <h4 class="admin-item-title" style="flex:1;">${esc(item.libelle)}</h4>
+        <span class="compta-montant ${isRec ? 'compta-montant--recette' : 'compta-montant--depense'}">${sign}${fmt(item.montant)} €</span>
+      </div>
+      <div class="admin-item-meta">
+        &#128197; ${esc(item.date || '')}
+        &nbsp;·&nbsp; ${catLabel}
+        ${item.notes ? `&nbsp;·&nbsp; <em>${esc(item.notes)}</em>` : ''}
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn-edit" data-edit="${esc(item.id)}">&#9998; Modifier</button>
+        <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.compta}">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  bindDeleteButtons(list, KEYS.compta, renderCompta, null, 'libelle');
+
+  list.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = getData(KEYS.compta).find(i => i.id === btn.dataset.edit);
+      if (item) populateComptaForm(item);
+    });
+  });
+}
+
+function populateComptaForm(item) {
+  editingComptaId = item.id;
+  const form = document.getElementById('form-compta');
+  const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val ?? ''; };
+  set('date',      item.date || '');
+  set('type',      item.type || '');
+  set('categorie', item.categorie || '');
+  set('libelle',   item.libelle || '');
+  set('montant',   item.montant != null ? item.montant : '');
+  set('notes',     item.notes || '');
+
+  document.getElementById('compta-form-title').textContent = 'Modifier l\'écriture';
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.textContent = 'Enregistrer les modifications';
+  if (!form.querySelector('.btn-cancel-edit')) {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn btn-outline-sm btn-full btn-cancel-edit';
+    cancelBtn.textContent = 'Annuler la modification';
+    cancelBtn.style.marginTop = '0.5rem';
+    cancelBtn.addEventListener('click', cancelComptaEdit);
+    submitBtn.after(cancelBtn);
+  }
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelComptaEdit() {
+  editingComptaId = null;
+  document.getElementById('form-compta').reset();
+  document.getElementById('compta-form-title').textContent = 'Nouvelle écriture';
+  const submitBtn = document.querySelector('#form-compta button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = 'Ajouter l\'écriture';
+  const cancelBtn = document.querySelector('#form-compta .btn-cancel-edit');
+  if (cancelBtn) cancelBtn.remove();
+}
+
+function bindComptaForm() {
+  const form = document.getElementById('form-compta');
+  if (!form) return;
+
+  const yearSel = document.getElementById('compta-filter-year');
+  const typeSel = document.getElementById('compta-filter-type');
+  if (yearSel) yearSel.addEventListener('change', renderCompta);
+  if (typeSel) typeSel.addEventListener('change', renderCompta);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const data = collectForm(e.target);
+    if (!data.date || !data.type || !data.categorie || !data.libelle || !data.montant) {
+      showToast('Veuillez remplir tous les champs obligatoires.', true);
+      return;
+    }
+    const montant = parseFloat(data.montant);
+    if (isNaN(montant) || montant <= 0) {
+      showToast('Le montant doit être supérieur à 0.', true);
+      return;
+    }
+
+    const fields = {
+      date:      data.date,
+      type:      data.type,
+      categorie: data.categorie,
+      libelle:   data.libelle.trim(),
+      montant,
+      notes:     (data.notes || '').trim(),
+    };
+
+    if (editingComptaId) {
+      const items = getData(KEYS.compta).map(i => i.id === editingComptaId ? { ...i, ...fields } : i);
+      saveData(KEYS.compta, items);
+      cancelComptaEdit();
+      showToast('Écriture modifiée !');
+    } else {
+      prepend(KEYS.compta, { id: genId('compta'), createdAt: new Date().toISOString(), ...fields });
+      form.reset();
+      showToast('Écriture ajoutée !');
+    }
+    renderCompta();
+  });
+}
+
 function bindBackupRestore() {
   const btnBackup    = document.getElementById('btn-backup-data');
   const inputRestore = document.getElementById('input-restore-data');

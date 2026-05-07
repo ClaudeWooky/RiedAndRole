@@ -69,6 +69,9 @@
         <button class="admin-nav-btn" data-section="bibliotheque">
           <span class="nav-icon">&#128218;</span> Bibliothèque
         </button>
+        <button class="admin-nav-btn" data-section="comptabilite">
+          <span class="nav-icon">&#128181;</span> Comptabilité
+        </button>
         <button class="admin-nav-btn" data-section="site">
           <span class="nav-icon">&#9881;</span> Site
         </button>
@@ -500,6 +503,104 @@
         </div>
       </section>
 
+      <!-- ═══════════════  SECTION COMPTABILITÉ  ════════════════════ -->
+      <section id="section-comptabilite" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128181; Comptabilité</h2>
+          <p>Suivi des recettes et dépenses de l'association.</p>
+        </div>
+
+        <div id="compta-summary" class="compta-summary"></div>
+
+        <div class="compta-filter-bar">
+          <div class="form-group" style="margin:0;">
+            <label for="compta-filter-year">Exercice</label>
+            <select id="compta-filter-year">
+              <option value="">Toutes les années</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label for="compta-filter-type">Type</label>
+            <select id="compta-filter-type">
+              <option value="">Tous</option>
+              <option value="recette">Recettes</option>
+              <option value="depense">Dépenses</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-layout">
+
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Écritures</h3>
+              <span class="item-count" id="count-compta">0</span>
+            </div>
+            <div id="list-compta" class="admin-list">
+              <p class="empty-msg">Aucune écriture enregistrée.</p>
+            </div>
+          </div>
+
+          <div class="admin-form-panel">
+            <div class="panel-header">
+              <h3 id="compta-form-title">Nouvelle écriture</h3>
+            </div>
+            <form id="form-compta" novalidate>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Date *</label>
+                  <input type="date" name="date" required />
+                </div>
+                <div class="form-group">
+                  <label>Type *</label>
+                  <select name="type" required id="compta-type-select">
+                    <option value="">— Choisir —</option>
+                    <option value="recette">&#128176; Recette</option>
+                    <option value="depense">&#128184; Dépense</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Catégorie *</label>
+                <select name="categorie" required>
+                  <option value="">— Choisir —</option>
+                  <optgroup label="Recettes">
+                    <option value="cotisation">Cotisations</option>
+                    <option value="don">Dons / Mécénat</option>
+                    <option value="subvention">Subventions</option>
+                    <option value="evenement">Événements</option>
+                    <option value="vente">Ventes</option>
+                    <option value="autre-recette">Autre recette</option>
+                  </optgroup>
+                  <optgroup label="Dépenses">
+                    <option value="materiel">Matériel / Jeux</option>
+                    <option value="local">Local / Loyer</option>
+                    <option value="fournitures">Fournitures</option>
+                    <option value="communication">Communication</option>
+                    <option value="frais-evenement">Frais événement</option>
+                    <option value="autre-depense">Autre dépense</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Libellé *</label>
+                <input type="text" name="libelle" placeholder="Description de l'écriture" required />
+              </div>
+              <div class="form-group">
+                <label>Montant (€) *</label>
+                <input type="number" name="montant" min="0.01" step="0.01" placeholder="0.00" required />
+              </div>
+              <div class="form-group">
+                <label>Notes <small>(optionnel)</small></label>
+                <textarea name="notes" rows="2" placeholder="Remarques éventuelles…"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-full" id="compta-submit-btn">Ajouter l'écriture</button>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
       <!-- ═══════════════  SECTION AGENDA  ═════════════════════════ -->
       <section id="section-agenda" class="admin-section">
         <div class="section-title-bar">
@@ -768,6 +869,10 @@
                     <span>Bibliothèque</span>
                   </label>
                   <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="comptabilite" />
+                    <span>Comptabilité</span>
+                  </label>
+                  <label class="perm-label">
                     <input type="checkbox" class="acc-perm-cb" value="site" />
                     <span>Site</span>
                   </label>
@@ -870,8 +975,9 @@
       <h3 class="backup-select-title">&#128190; Sauvegarder les données</h3>
       <p class="backup-select-hint">Choisissez les sections à inclure dans le fichier <code>.zip</code> :</p>
       <div class="backup-select-grid">
-        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="agenda"        checked> Agenda</label>
-        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="library"       checked> Bibliothèque</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="agenda"          checked> Agenda</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="library"         checked> Bibliothèque</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="comptabilite"    checked> Comptabilité</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="blog"          checked> Blog</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="events"        checked> Événements</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="games"         checked> Jeux</label>
