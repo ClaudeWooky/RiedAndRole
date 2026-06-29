@@ -1518,12 +1518,15 @@ function _renderWishlist() {
     grid.innerHTML = '<p class="wish-empty">La wishlist est vide. Soyez le premier à ajouter un souhait !</p>';
     return;
   }
+  const WISH_TAG_CLASS = { 'Achat approuvé': 'wish-tag--green', 'Arrivée imminente': 'wish-tag--blue' };
   grid.innerHTML = items.map(w => {
     const genre = BOOK_GENRES[w.genre] || { label: w.genre || '', color: 'blue', icon: '📚', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)' };
     const coverStyle = w.cover
       ? `background:#111;background-image:url('${escHtml(w.cover)}');background-size:cover;background-position:center`
       : `background:${escHtml(genre.gradient)}`;
-    const srcLabel = escHtml(w.source || '');
+    const tagsHtml = (w.tags || []).length
+      ? `<div class="wish-tags">${w.tags.map(t => `<span class="wish-tag ${WISH_TAG_CLASS[t] || ''}">${escHtml(t)}</span>`).join('')}</div>`
+      : '';
     return `
     <div class="wish-card" data-wish-id="${w.id}">
       <div class="wish-cover" style="${coverStyle}">
@@ -1534,7 +1537,7 @@ function _renderWishlist() {
         <h3>${escHtml(w.title)}</h3>
         ${w.author    ? `<p class="wish-author">${escHtml(w.author)}</p>` : ''}
         ${w.publisher ? `<p class="wish-publisher">${escHtml(w.publisher)}</p>` : ''}
-        ${srcLabel    ? `<span class="wish-source-badge">${srcLabel}</span>` : ''}
+        ${tagsHtml}
       </div>
     </div>`;
   }).join('');
@@ -1621,15 +1624,19 @@ function _initWishModal() {
     resultsList.innerHTML = allResults.map((r, i) => {
       const srcLbl = escHtml(r.source || '');
       const cover  = r.cover ? `<img class="wrc-cover" src="${escHtml(r.cover)}" alt="" loading="lazy">` : `<div class="wrc-cover wrc-no-cover">📚</div>`;
+      const urlAttr = r.url ? ` data-url="${escHtml(r.url)}"` : '';
+      const linkIcon = r.url ? `<a class="wrc-link-btn" href="${escHtml(r.url)}" target="_blank" rel="noopener noreferrer" title="Ouvrir la page" aria-label="Ouvrir dans un nouvel onglet">↗</a>` : '';
       return `
-      <div class="wish-result-card" data-idx="${i}">
+      <div class="wish-result-card${r.url ? ' wrc-has-link' : ''}" data-idx="${i}"${urlAttr}>
         ${cover}
         <div class="wrc-info">
           <strong>${escHtml(r.title)}</strong>
           ${r.author    ? `<span>${escHtml(r.author)}</span>` : ''}
           ${r.publisher ? `<span>${escHtml(r.publisher)}</span>` : ''}
           ${srcLbl      ? `<span class="wrc-source">${srcLbl}</span>` : ''}
+          ${r.price     ? `<span class="wrc-price">${escHtml(r.price)}</span>` : ''}
         </div>
+        ${linkIcon}
         <button class="btn btn-sm btn-outline wrc-select-btn" data-idx="${i}">Choisir</button>
       </div>`;
     }).join('');
@@ -1639,6 +1646,13 @@ function _initWishModal() {
         const idx = parseInt(btn.dataset.idx, 10);
         _selectedItem = allResults[idx];
         _showPreview(_selectedItem);
+      });
+    });
+
+    resultsList.querySelectorAll('.wish-result-card.wrc-has-link').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.closest('.wrc-select-btn') || e.target.closest('.wrc-link-btn')) return;
+        window.open(card.dataset.url, '_blank', 'noopener,noreferrer');
       });
     });
   }

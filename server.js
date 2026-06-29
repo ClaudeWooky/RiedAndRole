@@ -290,7 +290,7 @@ function verifyPw(password, storedHash, salt) {
 
 /* ── Accounts helpers ────────────────────────────────────────────── */
 const ACCOUNTS_FILE = path.join(DATA, 'accounts.json');
-const ALL_PERMS = ['evenements', 'agenda', 'jeux', 'equipe', 'blog', 'bibliotheque', 'comptabilite', 'site'];
+const ALL_PERMS = ['evenements', 'agenda', 'jeux', 'wishlist', 'equipe', 'blog', 'bibliotheque', 'parties', 'comptabilite', 'statistiques', 'site'];
 
 function loadAccounts() {
   try { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')); }
@@ -575,6 +575,7 @@ async function searchBBE(q) {
           description
           rangeId
           rangeSlug
+          priceFrom
         }
       }
     }
@@ -604,9 +605,10 @@ async function searchBBE(q) {
     author:      '',
     publisher:   'Black Book Éditions',
     year:        '',
-    cover:       p.images?.[0]?.sizeS || p.images?.[0]?.default || null,
+    cover:       (() => { const c = p.images?.[0]?.sizeS || p.images?.[0]?.default || null; return c ? (c.startsWith('http') ? c : BBE_BASE + c) : null; })(),
     description: (p.description || p.shortDescription || '').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,500),
     url:         p.id && p.nameSlug ? `${BBE_BASE}/produit/${p.id}/0/${p.rangeSlug || 'gamme'}/${p.nameSlug}` : null,
+    price:       p.priceFrom ? `${parseFloat(p.priceFrom).toFixed(2)} €` : null,
     source:      'BBE'
   })).filter(p => p.title);
 }
@@ -1648,6 +1650,31 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── PATCH /api/wishlist/:id  (mise à jour des tags) ──────────
+    const wishPatchM = pathname.match(/^\/api\/wishlist\/(\d+)$/);
+    if (wishPatchM && req.method === 'PATCH') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+      const session = getSession(req);
+      if (!session) { res.writeHead(403, JSON_HDR); res.end(JSON.stringify({ ok: false })); return; }
+      try {
+        const body = JSON.parse(await readBody(req));
+        const id = parseInt(wishPatchM[1], 10);
+        const wishFile = path.join(DATA, 'wishlist.json');
+        let items = [];
+        try { items = JSON.parse(fs.readFileSync(wishFile, 'utf8')); } catch {}
+        const idx = items.findIndex(it => it.id === id);
+        if (idx === -1) { res.writeHead(404, JSON_HDR); res.end(JSON.stringify({ ok: false, error: 'Introuvable.' })); return; }
+        items[idx].tags = (body.tags || []).map(t => String(t).trim()).filter(Boolean);
+        fs.writeFileSync(wishFile, JSON.stringify(items, null, 2), 'utf8');
+        res.writeHead(200, JSON_HDR);
+        res.end(JSON.stringify({ ok: true, item: items[idx] }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
     // ── DELETE /api/wishlist/:id ──────────────────────────────────
     const wishDelM = pathname.match(/^\/api\/wishlist\/(\d+)$/);
     if (wishDelM && req.method === 'DELETE') {
@@ -1804,6 +1831,220 @@ const server = http.createServer(async (req, res) => {
         console.error('[scrape-myludo]', err.message);
         res.writeHead(200, JSON_HDR);
         res.end(JSON.stringify({ ok: false, error: 'Erreur lors du scraping : ' + err.message }));
+      }
+      return;
+    }
+
+    // ── GET /api/search-jdr-item ─────────────────────────────────
+    if (pathname === '/api/search-jdr-item' && req.method === 'GET') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+
+      const qDirect = (u.searchParams.get('q')       || '').trim();
+      const gamme   = (u.searchParams.get('gamme')   || '').trim();
+      const systeme = (u.searchParams.get('systeme') || '').trim();
+      const livre   = (u.searchParams.get('livre')   || '').trim();
+
+      if (!qDirect && !livre && !gamme && !systeme) {
+        res.writeHead(400, JSON_HDR);
+        res.end(JSON.stringify({ ok: false, error: 'Paramètres manquants' }));
+        return;
+      }
+
+      const q = qDirect || [gamme, livre].filter(Boolean).join(' ').trim() || systeme;
+
+      try {
+        function mapJdrCategory(tags, sys, gam, desc) {
+          const all = [...(tags || []), sys || '', gam || '', (desc || '').slice(0, 200)].join(' ').toLowerCase();
+          if (/horreur|cthulhu|horror|terreur|lovecr/.test(all))              return 'horreur';
+          if (/cyberpunk|cyber|transhumanis/.test(all))                       return 'cyberpunk';
+          if (/sci.fi|science.fiction|futur|spatial|stellaire/.test(all))     return 'scifi';
+          if (/post.apoca|apocal|wasteland|nucl/.test(all))                   return 'postapocalypse';
+          if (/historique|m.di.val|moyen.age|rome|egypt|antiquit/.test(all))  return 'historique';
+          if (/super.her|superhero|cape|masque/.test(all))                    return 'superheros';
+          if (/pirate|corsair|flibust/.test(all))                             return 'pirates';
+          if (/western|cowboy|far.west/.test(all))                            return 'western';
+          if (/contemp|moderne|urban|contemporain/.test(all))                 return 'contemporain';
+          if (/japon|manga|anime|oriental|asiatique/.test(all))               return 'fantasyjap';
+          if (/multi.vers|cross.*genre|dimension|portail/.test(all))          return 'multivers';
+          if (/g.n.rique|universel|multi.syst/.test(all))                     return 'generique';
+          if (/science.fantas|sword.*sor|space.*fantasy/.test(all))           return 'sciencefantasy';
+          if (/humorist|com.die|caricatur|parodie|satirique/.test(all))       return 'caricatural';
+          if (/fantasy|magie|dragon|elfe|nain|sorcier|tolkien/.test(all))     return 'fantasy';
+          return 'autre';
+        }
+
+        /* ── Helpers locaux ── */
+        function withTimeout(p, ms) {
+          return new Promise((ok, ko) => {
+            const t = setTimeout(() => ko(new Error('timeout ' + ms + 'ms')), ms);
+            p.then(v => { clearTimeout(t); ok(v); }, e => { clearTimeout(t); ko(e); });
+          });
+        }
+
+        async function safeSearch(fn, label, ms) {
+          try {
+            const items = await withTimeout(fn(), ms);
+            return { items: items || [], error: null };
+          } catch (e) {
+            console.error(`[jdr-search ${label}]`, e.message);
+            return { items: [], error: e.message };
+          }
+        }
+
+        /* ── BBE via HTML PrestaShop (plus stable que GraphQL) ── */
+        async function searchBBEHtml(sq) {
+          const BBE = 'https://shop.black-book-editions.fr';
+          const { status, body: html } = await fetchExternal(
+            `${BBE}/fr/recherche?s=${encodeURIComponent(sq)}`,
+            { 'Accept': 'text/html,*/*', 'Accept-Language': 'fr-FR,fr;q=0.9' }, 10000
+          );
+          if (status !== 200 || !html) return [];
+
+          const results = [];
+          /* Chaque fiche produit PrestaShop est dans un <article class="product-miniature ..."> */
+          const artRe = /<article[^>]+class="[^"]*product-miniature[^"]*"[\s\S]*?<\/article>/gi;
+          let m;
+          while ((m = artRe.exec(html)) !== null && results.length < 5) {
+            const block = m[0];
+            const linkM  = block.match(/href="(https?:\/\/[^"]+|\/fr\/[^"]+)"/i);
+            const imgM   = block.match(/<img[^>]+(?:data-src|src)="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"[^>]*>/i);
+            const titM   = block.match(/class="[^"]*product-title[^"]*"[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i)
+                        || block.match(/<a[^>]+title="([^"]+)"[^>]*class="[^"]*thumbnail[^"]*"/i);
+            const title  = titM   ? titM[1].trim() : '';
+            const url    = linkM  ? (linkM[1].startsWith('http') ? linkM[1] : BBE + linkM[1]) : null;
+            const rawImg = imgM   ? imgM[1] : null;
+            const cover  = rawImg ? (rawImg.startsWith('http') ? rawImg : BBE + rawImg) : null;
+            if (title) results.push({ title, cover, description: '', url, publisher: 'Black Book Éditions', source: 'BBE' });
+          }
+          return results;
+        }
+
+        async function searchBBEJdr(sq) {
+          /* 1) GraphQL */
+          try {
+            const r = await withTimeout(searchBBE(sq), 6000);
+            if (r && r.length) return r;
+          } catch (_) {}
+          /* 2) Fallback HTML */
+          return searchBBEHtml(sq);
+        }
+
+        /* ── MyLudo sans CSRF (appel direct de l'API de recherche) ── */
+        async function searchMyLudoSimple(sq) {
+          const path = `/views/search/datas.php?type=search&tab=games&words=${encodeURIComponent(sq)}&page=1&order=bymagic`;
+          const resp = await new Promise((ok, ko) => {
+            const r2 = https.request({
+              hostname: 'www.myludo.fr', path, method: 'GET',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 RiedRole/1.0',
+                'Accept': 'application/json, text/javascript, */*',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': 'https://www.myludo.fr/',
+                'Origin':  'https://www.myludo.fr'
+              }
+            }, res2 => {
+              const chunks = [];
+              res2.on('data', c => chunks.push(c));
+              res2.on('end', () => ok({ status: res2.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+            });
+            r2.on('error', ko);
+            r2.setTimeout(8000, () => r2.destroy(new Error('timeout')));
+            r2.end();
+          });
+          if (resp.status !== 200) throw new Error('HTTP ' + resp.status);
+          const json  = JSON.parse(resp.body);
+          const items = (json.list || []).slice(0, 5);
+          return items.map(g => ({
+            title:       g.title || '',
+            cover:       g.image?.S300 || g.image?.S160 || g.image?.S80 || null,
+            description: '',
+            url:         g.code ? `https://www.myludo.fr/#!/jeu/${g.code}` : null,
+            source:      'MyLudo'
+          }));
+        }
+
+        async function searchMyLudoJdr(sq) {
+          /* 1) Sans CSRF (plus rapide) */
+          try {
+            const r = await withTimeout(searchMyLudoSimple(sq), 8000);
+            if (r && r.length) return r;
+          } catch (_) {}
+          /* 2) Avec CSRF (plus lent mais complet) */
+          return withTimeout(searchMyLudo(sq), 18000);
+        }
+
+        function toItems(raw, limit) {
+          const seen = new Set();
+          return (raw || [])
+            .filter(r => {
+              const key = (r.title || '').toLowerCase().trim().replace(/\s+/g, ' ').slice(0, 40);
+              if (!key || seen.has(key)) return false;
+              seen.add(key); return true;
+            })
+            .slice(0, limit)
+            .map(r => ({
+              title:       r.title,
+              description: r.description,
+              cover:       r.cover || null,
+              category:    mapJdrCategory(r.tags, systeme, gamme, r.description),
+              system:      r.system || '',
+              publisher:   r.publisher || '',
+              url:         r.url,
+              source:      r.source
+            }));
+        }
+
+        // Recherches en parallèle
+        const [philSrc, bbeSrc, myludoSrc] = await Promise.all([
+          safeSearch(() => searchPhilibert(q),  'Philibert', 12000),
+          safeSearch(() => searchBBEJdr(q),     'BBE',       14000),
+          safeSearch(() => searchMyLudoJdr(q),  'MyLudo',    22000)
+        ]);
+
+        const groups = {
+          philibert: { items: toItems(philSrc.items,   5), error: philSrc.error   },
+          bbe:       { items: toItems(bbeSrc.items,    5), error: bbeSrc.error    },
+          myludo:    { items: toItems(myludoSrc.items, 5), error: myludoSrc.error }
+        };
+
+        const found = groups.philibert.items.length > 0 || groups.bbe.items.length > 0 || groups.myludo.items.length > 0;
+        res.writeHead(200, JSON_HDR);
+        res.end(JSON.stringify({ ok: true, found, groups }));
+      } catch (err) {
+        console.error('[search-jdr-item]', err.message);
+        res.writeHead(500, JSON_HDR);
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+      return;
+    }
+
+    // ── GET /api/proxy-cover ──────────────────────────────────────
+    if (pathname === '/api/proxy-cover' && req.method === 'GET') {
+      const JSON_HDR = { 'Content-Type': 'application/json; charset=utf-8' };
+      const coverUrl = (u.searchParams.get('url') || '').trim();
+      if (!coverUrl) {
+        res.writeHead(400, JSON_HDR);
+        res.end(JSON.stringify({ ok: false, error: 'url manquante' }));
+        return;
+      }
+      try {
+        const imgUrl = coverUrl.startsWith('//') ? 'https:' + coverUrl : coverUrl;
+        const imgResp = await new Promise((resolve, reject) => {
+          const req2 = https.get(imgUrl, { headers: { 'Referer': 'https://www.philibertnet.com/fr/' } }, r => {
+            const chunks = [];
+            r.on('data', c => chunks.push(c));
+            r.on('end', () => resolve({ status: r.statusCode, headers: r.headers, data: Buffer.concat(chunks) }));
+          });
+          req2.on('error', reject);
+          req2.setTimeout(8000, () => req2.destroy(new Error('timeout')));
+        });
+        if (imgResp.status !== 200) throw new Error('HTTP ' + imgResp.status);
+        const mime = imgResp.headers['content-type']?.split(';')[0] || 'image/jpeg';
+        res.writeHead(200, JSON_HDR);
+        res.end(JSON.stringify({ ok: true, base64: `data:${mime};base64,${imgResp.data.toString('base64')}` }));
+      } catch (err) {
+        res.writeHead(200, JSON_HDR);
+        res.end(JSON.stringify({ ok: false, error: err.message }));
       }
       return;
     }

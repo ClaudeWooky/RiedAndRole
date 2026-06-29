@@ -43,41 +43,57 @@
   <!-- ═══════════════════  SHELL ADMIN  ═══════════════════════════ -->
   <div id="admin-shell" class="hidden">
 
-    <!-- Top bar -->
-    <header id="admin-header">
-      <a href="index.html" class="admin-logo">
-        <span class="logo-icon">&#9670;</span>
-        <span>Ried &amp; Rôle</span>
-        <span class="admin-badge">ADMIN</span>
-      </a>
+    <!-- Sidebar verticale -->
+    <aside id="admin-sidebar">
+      <div class="sidebar-top">
+        <a href="index.html" class="admin-logo">
+          <span class="logo-icon">&#9670;</span>
+          <span class="nav-label">Ried &amp; Rôle</span>
+          <span class="admin-badge nav-label">ADMIN</span>
+        </a>
+        <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Réduire le menu">&#10094;</button>
+      </div>
       <nav class="admin-nav">
         <button class="admin-nav-btn active" data-section="evenements">
-          <span class="nav-icon">&#128197;</span> Événements
+          <span class="nav-icon">&#128197;</span><span class="nav-label">Événements</span>
         </button>
         <button class="admin-nav-btn" data-section="agenda">
-          <span class="nav-icon">&#128198;</span> Agenda
+          <span class="nav-icon">&#128198;</span><span class="nav-label">Agenda</span>
         </button>
         <button class="admin-nav-btn" data-section="jeux">
-          <span class="nav-icon">&#9876;</span> Jeux de Rôles
+          <span class="nav-icon">&#9876;</span><span class="nav-label">Jeux de Rôles</span>
+        </button>
+        <button class="admin-nav-btn" data-section="wishlist">
+          <span class="nav-icon">&#127873;</span><span class="nav-label">Wishlist</span>
         </button>
         <button class="admin-nav-btn" data-section="equipe">
-          <span class="nav-icon">&#128100;</span> L'Équipe
+          <span class="nav-icon">&#128100;</span><span class="nav-label">L'Équipe</span>
         </button>
         <button class="admin-nav-btn" data-section="blog">
-          <span class="nav-icon">&#128240;</span> Blog
+          <span class="nav-icon">&#128240;</span><span class="nav-label">Blog</span>
         </button>
         <button class="admin-nav-btn" data-section="bibliotheque">
-          <span class="nav-icon">&#128218;</span> Bibliothèque
+          <span class="nav-icon">&#128218;</span><span class="nav-label">Bibliothèque</span>
+        </button>
+        <button class="admin-nav-btn" data-section="parties">
+          <span class="nav-icon">&#127922;</span><span class="nav-label">Parties</span>
         </button>
         <button class="admin-nav-btn" data-section="comptabilite">
-          <span class="nav-icon">&#128181;</span> Comptabilité
+          <span class="nav-icon">&#128181;</span><span class="nav-label">Comptabilité</span>
+        </button>
+        <button class="admin-nav-btn" data-section="statistiques">
+          <span class="nav-icon">&#128202;</span><span class="nav-label">Statistiques</span>
         </button>
         <button class="admin-nav-btn" data-section="site">
-          <span class="nav-icon">&#9881;</span> Site
+          <span class="nav-icon">&#9881;</span><span class="nav-label">Site</span>
         </button>
       </nav>
-      <button id="logout-btn" class="btn btn-outline-sm">&#128682; Déconnexion</button>
-    </header>
+      <div class="sidebar-bottom">
+        <button id="logout-btn" class="sidebar-logout-btn">
+          <span class="nav-icon">&#128682;</span><span class="nav-label">Déconnexion</span>
+        </button>
+      </div>
+    </aside>
 
     <main id="admin-main">
 
@@ -224,6 +240,7 @@
         <div class="section-title-bar">
           <h2>&#9876; Gestion des Jeux de Rôles</h2>
           <p>Les jeux ajoutés ici apparaîtront sur la page Jeux de Rôles du site.</p>
+          <button type="button" id="excel-import-open" class="btn btn-outline" style="margin-top:.5rem;font-size:.8rem;padding:.3rem .8rem;">&#128202; Importer Excel</button>
         </div>
         <div class="admin-layout">
 
@@ -311,6 +328,65 @@
               <button type="submit" class="btn btn-primary btn-full">Ajouter le jeu</button>
             </form>
           </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════  SECTION WISHLIST  ══════════════════════ -->
+      <section id="section-wishlist" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#127873; Wishlist</h2>
+          <p>Articles à acquérir. Ils apparaîtront sur la page Wishlist du site.</p>
+          <button type="button" id="wishlist-export-btn" class="btn btn-outline" style="margin-top:.5rem;font-size:.8rem;padding:.3rem .8rem;">&#128190; Exporter Excel</button>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Articles en wishlist</h3>
+              <span class="item-count" id="count-wishlist">0</span>
+            </div>
+            <div id="list-wishlist" class="admin-list">
+              <p class="empty-msg">Aucun article en wishlist.</p>
+            </div>
+          </div>
+
+          <!-- Éditeur de tags -->
+          <div class="admin-form-panel">
+            <div class="panel-header">
+              <h3>Tags &amp; actions</h3>
+            </div>
+            <div id="wishlist-tag-editor">
+              <p class="empty-msg" id="wishlist-no-selection" style="padding:2rem 1.5rem;">&#128072; Sélectionnez un article pour gérer ses tags.</p>
+              <div id="wishlist-tag-form" style="display:none;padding:1.5rem;">
+
+                <!-- Aperçu article sélectionné -->
+                <div class="wishlist-editor-preview" id="wishlist-editor-preview"></div>
+
+                <!-- Tags -->
+                <div class="form-group" style="margin-top:1.4rem;">
+                  <label>Tags</label>
+                  <div class="wishlist-tag-checks">
+                    <label class="wishlist-tag-check" id="wtag-achat-label">
+                      <input type="checkbox" id="wtag-achat" value="Achat approuvé">
+                      <span class="wishlist-tag-check-inner">&#10003; Achat approuvé</span>
+                    </label>
+                    <label class="wishlist-tag-check" id="wtag-arrivee-label">
+                      <input type="checkbox" id="wtag-arrivee" value="Arrivée imminente">
+                      <span class="wishlist-tag-check-inner">&#128230; Arrivée imminente</span>
+                    </label>
+                  </div>
+                </div>
+                <button type="button" id="wishlist-tags-save" class="btn btn-primary btn-full">&#128190; Enregistrer les tags</button>
+
+                <hr class="form-sep" style="margin:1.5rem 0;">
+
+                <button type="button" id="wishlist-tags-delete" class="btn-wishlist-delete">&#128465; Supprimer cet article de la wishlist</button>
+
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -503,6 +579,80 @@
         </div>
       </section>
 
+      <!-- ════════════════  SECTION PARTIES  ═══════════════════════ -->
+      <section id="section-parties" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#127922; Parties jouées</h2>
+          <p>Enregistrez les sessions et scénarios joués par l'association.</p>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Sessions enregistrées</h3>
+              <span class="item-count" id="count-parties">0</span>
+            </div>
+            <div id="list-parties"></div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="admin-form-panel">
+            <h3 class="form-title" id="parties-form-title">Nouvelle partie</h3>
+            <form id="form-parties" novalidate>
+
+              <div class="form-group">
+                <label>Jeu de rôle *</label>
+                <input type="text" name="jdr" placeholder="Ex : Appel de Cthulhu, D&amp;D 5e…" required autocomplete="off" />
+              </div>
+
+              <div class="form-group">
+                <label>Scénario</label>
+                <input type="text" name="scenario" placeholder="Nom du scénario (optionnel)" autocomplete="off" />
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Date *</label>
+                  <input type="date" name="date" required />
+                </div>
+                <div class="form-group">
+                  <label>Nombre de joueurs *</label>
+                  <input type="number" name="nbJoueurs" min="1" max="20" placeholder="Ex : 4" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Maître de Jeu *</label>
+                <input type="text" name="mj" placeholder="Nom du MJ" required autocomplete="off" />
+              </div>
+
+              <div class="form-group">
+                <label>Lieu *</label>
+                <input type="text" name="lieu" placeholder="Ex : Local Ried&amp;Rôle, Chez Alice…" required autocomplete="off" />
+              </div>
+
+              <div class="form-group">
+                <label>Noms des joueurs</label>
+                <input type="text" name="joueurs" placeholder="Ex : Alice, Bob, Charlie… (optionnel)" autocomplete="off" />
+              </div>
+
+              <div class="form-group">
+                <label>Commentaire</label>
+                <textarea name="commentaire" rows="3" placeholder="Notes, ambiance, anecdotes… (optionnel)"></textarea>
+              </div>
+
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" id="parties-submit-btn">&#43; Enregistrer la partie</button>
+                <button type="button" class="btn btn-outline btn-cancel-edit" id="parties-cancel-btn" style="display:none">Annuler</button>
+              </div>
+
+            </form>
+          </div>
+
+        </div>
+      </section>
+
       <!-- ═══════════════  SECTION COMPTABILITÉ  ════════════════════ -->
       <section id="section-comptabilite" class="admin-section">
         <div class="section-title-bar">
@@ -684,6 +834,28 @@
           </div>
 
         </div>
+      </section>
+
+      <!-- ═══════════════  SECTION STATISTIQUES  ══════════════════ -->
+      <section id="section-statistiques" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128202; Statistiques</h2>
+          <p>Tableau de bord de l'activité de l'association sur une période donnée.</p>
+        </div>
+
+        <div class="stats-filters">
+          <div class="form-group" style="margin:0">
+            <label>Du</label>
+            <input type="date" id="stats-date-from" />
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Au</label>
+            <input type="date" id="stats-date-to" />
+          </div>
+          <button class="btn btn-primary" id="stats-calc-btn">&#128202; Calculer</button>
+        </div>
+
+        <div id="stats-output"></div>
       </section>
 
       <!-- ═══════════════  SECTION SITE  ══════════════════════════ -->
@@ -1034,7 +1206,54 @@
     </div>
   </div>
 
+  <!-- ══════════════  MODAL IMPORT EXCEL JDR  ══════════════ -->
+  <div id="excel-import-overlay" class="modal-overlay" hidden>
+    <div class="excel-import-card">
+      <div class="excel-import-header">
+        <span>&#128202; Import Excel — Jeux de R&ocirc;les</span>
+        <button type="button" id="excel-import-close" class="blog-editor-close-btn" title="Fermer">&#x2715;</button>
+      </div>
+      <div class="excel-import-body">
+
+        <!-- Sélection du fichier -->
+        <div class="excel-import-file-row">
+          <label for="excel-file-input" class="btn btn-outline" style="cursor:pointer;font-size:.85rem;padding:.3rem .8rem;">
+            &#128194; Choisir un fichier Excel
+          </label>
+          <input type="file" id="excel-file-input" accept=".xlsx,.xls,.ods,.csv" style="display:none;" />
+          <span id="excel-file-name" class="excel-file-name-label">Aucun fichier</span>
+          <button type="button" id="excel-import-start" class="btn btn-primary" style="font-size:.85rem;padding:.3rem .9rem;" disabled>&#9654; Lancer</button>
+        </div>
+
+        <!-- Progression article par article -->
+        <div id="excel-import-progress" class="excel-import-progress" hidden>
+          <div class="excel-progress-header">
+            <span id="excel-progress-counter" class="excel-progress-counter"></span>
+            <div class="excel-progress-query-row">
+              <input type="text" id="excel-progress-query" class="excel-progress-query-input" />
+              <button type="button" id="excel-import-research" class="btn btn-outline excel-research-btn" title="Relancer la recherche avec ce texte">&#128269; Relancer</button>
+            </div>
+          </div>
+          <div class="excel-progress-track"><div id="excel-progress-bar" class="excel-progress-fill"></div></div>
+        </div>
+
+        <!-- Grille des choix -->
+        <div id="excel-import-results" class="excel-import-results"></div>
+
+        <!-- Message de fin -->
+        <div id="excel-import-done" class="excel-import-done" hidden>&#10003; Import termin&eacute; !</div>
+
+      </div>
+      <div class="excel-import-footer">
+        <span id="excel-import-status" class="excel-import-status"></span>
+        <button type="button" id="excel-import-skip" class="btn btn-outline" style="font-size:.85rem;" disabled>Passer &#8594;</button>
+        <button type="button" id="excel-import-save" class="btn btn-primary" style="font-size:.85rem;" disabled>&#128190; Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

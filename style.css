@@ -1939,16 +1939,32 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   color: var(--text-muted);
   margin: 0;
 }
-.wish-source-badge {
+.wish-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin-top: auto;
+  padding-top: .4rem;
+}
+.wish-tag {
   display: inline-block;
-  margin-top: .3rem;
   font-size: .68rem;
-  padding: .15rem .45rem;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: .2rem .55rem;
   border-radius: 20px;
-  background: rgba(99,179,237,.12);
-  color: #63b3ed;
-  border: 1px solid rgba(99,179,237,.25);
-  align-self: flex-start;
+}
+.wish-tag--green {
+  background: rgba(34,197,94,.15);
+  color: #86efac;
+  border: 1px solid rgba(34,197,94,.3);
+}
+.wish-tag--blue {
+  background: rgba(59,130,246,.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59,130,246,.3);
 }
 
 /* Wishlist modal */
@@ -1964,17 +1980,37 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   padding: 2rem;
   position: relative;
 }
+.wish-modal-box .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
 .wish-modal-box h2 {
   font-family: 'Cinzel', serif;
   color: var(--text-light);
-  margin: 0 0 1.5rem;
+  margin: 0;
   font-size: 1.3rem;
 }
+.wish-modal-box .modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.wish-modal-box .modal-close:hover {
+  color: var(--text-light);
+}
+.wish-search-form .form-row { grid-template-columns: 1fr 2fr; }
 .wish-search-row {
   display: flex;
   gap: .6rem;
 }
-.wish-search-row input { flex: 1; }
+.wish-search-row input { flex: 1; min-width: 0; }
 .wish-results-list {
   display: flex;
   flex-direction: column;
@@ -1999,6 +2035,18 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   border-radius: 8px;
   padding: .65rem .85rem;
 }
+.wish-result-card.wrc-has-link { cursor: pointer; }
+.wish-result-card.wrc-has-link:hover { border-color: var(--accent); background: var(--bg-card-hover, var(--bg-card)); }
+.wrc-link-btn {
+  color: var(--text-muted);
+  font-size: 1rem;
+  text-decoration: none;
+  flex-shrink: 0;
+  padding: .2rem .3rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+.wrc-link-btn:hover { color: var(--accent); }
 .wrc-cover {
   width: 52px;
   height: 68px;
@@ -2023,6 +2071,7 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
 }
 .wrc-info strong { font-size: .9rem; color: var(--text-light); }
 .wrc-info span   { font-size: .8rem; color: var(--text-muted); }
+.wrc-price { color: var(--accent) !important; font-weight: 600; }
 .wrc-source {
   font-size: .72rem !important;
   padding: .1rem .35rem;

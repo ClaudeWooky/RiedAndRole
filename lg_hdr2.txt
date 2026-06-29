@@ -1,0 +1,7 @@
+HTTP/1.1 301 Moved Permanently
+Date: Sun, 31 May 2026 08:28:06 GMT
+Server: Apache
+Location: https://www.legrog.org/recherche
+Content-Length: 280
+Content-Type: text/html; charset=iso-8859-1
+

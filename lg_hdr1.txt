@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+Date: Sun, 31 May 2026 08:27:58 GMT
+Server: Apache
+X-Powered-By: Servlet 2.4; JBoss-4.2.3.GA (build: SVNTag=JBoss_4_2_3_GA date=200807181439)/JBossWeb-2.0
+Set-Cookie: JSESSIONID=1856C76EF4CBF7E2452BD432199423AA; Path=/; Secure
+X-Powered-By: JSF/1.2
+Content-Type: text/html;charset=ISO-8859-1
+Vary: Accept-Encoding
+Transfer-Encoding: chunked
+

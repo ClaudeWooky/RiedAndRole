@@ -9,7 +9,7 @@ const SESSION_KEY = 'rr_admin_auth';
 const TOKEN_KEY   = 'rr_admin_token';
 const PERMS_KEY   = 'rr_admin_perms';
 
-const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', equipe: 'equipe', blog: 'blog', bibliotheque: 'bibliotheque', comptabilite: 'comptabilite', agenda: 'agenda', site: 'site' };
+const SECTION_PERMS = { evenements: 'evenements', jeux: 'jeux', wishlist: 'wishlist', equipe: 'equipe', blog: 'blog', bibliotheque: 'bibliotheque', comptabilite: 'comptabilite', agenda: 'agenda', site: 'site' };
 
 let editingTeamId    = null;
 let editingEventId   = null;
@@ -42,7 +42,8 @@ const KEYS = {
   evtnotif:  'event_notif_subs',
   notif:     'notif_log',
   analytics: 'analytics',
-  compta:    'comptabilite'
+  compta:    'comptabilite',
+  parties:   'parties'
 };
 
 const BLOG_CATS = {
@@ -92,15 +93,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkAuth();
   bindLogin();
   bindLogout();
+  bindSidebarToggle();
   bindSectionNav();
   bindGameCategoryAutoFill();
   bindMyLudoImport();
+  bindExcelImport();
+  bindWishlistExport();
+  bindWishlistTagEditor();
   bindMemberTypeToggle();
   bindPhotoInput();
   bindGameImageInput();
   bindForms();
   bindBlogForm();
   bindLibraryForm();
+  bindPartiesForm();
+  bindStatsForm();
   bindComptaForm();
   bindAgendaForm();
   bindSiteForm();
@@ -110,13 +117,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR TOGGLE
+═══════════════════════════════════════════════════════════════════ */
+function bindSidebarToggle() {
+  const sidebar   = document.getElementById('admin-sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  if (!sidebar || !toggleBtn) return;
+
+  function applyCollapsed(collapsed) {
+    sidebar.classList.toggle('collapsed', collapsed);
+    toggleBtn.innerHTML = collapsed ? '&#10095;' : '&#10094;';
+    toggleBtn.title     = collapsed ? 'Étendre le menu' : 'Réduire le menu';
+  }
+
+  const saved = localStorage.getItem('rr_sidebar_collapsed') === 'true';
+  if (saved) applyCollapsed(true);
+
+  toggleBtn.addEventListener('click', () => {
+    const next = !sidebar.classList.contains('collapsed');
+    applyCollapsed(next);
+    localStorage.setItem('rr_sidebar_collapsed', next);
+  });
+
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    AUTH
 ═══════════════════════════════════════════════════════════════════ */
 function checkAuth() {
   if (sessionStorage.getItem(SESSION_KEY) === 'true') {
     showShell();
     const perms = JSON.parse(sessionStorage.getItem(PERMS_KEY) || 'null');
-    applyPermissions(perms || ['evenements','agenda','jeux','equipe','blog','bibliotheque','comptabilite','site']);
+    applyPermissions(perms || ['evenements','agenda','jeux','wishlist','equipe','blog','bibliotheque','parties','comptabilite','statistiques','site']);
   }
 }
 
@@ -1009,6 +1041,361 @@ function bindMyLudoImport() {
   });
 }
 
+/* ─── Excel import (Jeux de Rôles) ──────────────────────────────── */
+function bindExcelImport() {
+  const overlay      = document.getElementById('excel-import-overlay');
+  const openBtn      = document.getElementById('excel-import-open');
+  const closeBtn     = document.getElementById('excel-import-close');
+  const fileInput    = document.getElementById('excel-file-input');
+  const fileLabel    = document.getElementById('excel-file-name');
+  const startBtn     = document.getElementById('excel-import-start');
+  const progressEl   = document.getElementById('excel-import-progress');
+  const counterEl    = document.getElementById('excel-progress-counter');
+  const queryEl      = document.getElementById('excel-progress-query');
+  const researchBtn  = document.getElementById('excel-import-research');
+  const barEl        = document.getElementById('excel-progress-bar');
+  const resultsEl    = document.getElementById('excel-import-results');
+  const doneEl       = document.getElementById('excel-import-done');
+  const skipBtn      = document.getElementById('excel-import-skip');
+  const saveBtn      = document.getElementById('excel-import-save');
+  const statusEl     = document.getElementById('excel-import-status');
+  // legacy refs kept for reset compatibility
+  const addAllBtn  = null;
+  const stopBtn    = null;
+  const traceEl    = null;
+  if (!overlay || !openBtn) return;
+
+  const CAT_MAP = {
+    fantasy:        { tag:'Fantasy',         color:'purple', icon:'⚔',  gradient:'linear-gradient(135deg,#1a0a2e,#4b1c7d)' },
+    horreur:        { tag:'Horreur',         color:'red',    icon:'💀',  gradient:'linear-gradient(135deg,#1a0808,#7d1c1c)' },
+    scifi:          { tag:'Sci-Fi',          color:'green',  icon:'🚀',  gradient:'linear-gradient(135deg,#0a0a1a,#1c1c5c)' },
+    historique:     { tag:'Historique',      color:'orange', icon:'🏛️', gradient:'linear-gradient(135deg,#1a1a0a,#5c4b1c)' },
+    multivers:      { tag:'Multivers',       color:'pink',   icon:'🌀',  gradient:'linear-gradient(135deg,#1a0514,#5c0d3a)' },
+    cyberpunk:      { tag:'Cyberpunk',       color:'cyan',   icon:'🤖',  gradient:'linear-gradient(135deg,#001a1a,#003d40)' },
+    postapocalypse: { tag:'Post-Apocalypse', color:'amber',  icon:'☢️', gradient:'linear-gradient(135deg,#1a0c00,#4a2200)' },
+    caricatural:    { tag:'Caricatural',     color:'lime',   icon:'🃏',  gradient:'linear-gradient(135deg,#081a00,#1a3d00)' },
+    contemporain:   { tag:'Contemporain',    color:'blue',   icon:'🏙️', gradient:'linear-gradient(135deg,#050b1a,#0e204d)' },
+    fantasyjap:     { tag:'Fantasy Jap.',    color:'rose',   icon:'⛩️', gradient:'linear-gradient(135deg,#1a0508,#4a0f18)' },
+    superheros:     { tag:'Super-Héros',     color:'gold',   icon:'⚡',  gradient:'linear-gradient(135deg,#1a1400,#403200)' },
+    western:        { tag:'Western',         color:'brown',  icon:'🤠',  gradient:'linear-gradient(135deg,#1a0e00,#3d2200)' },
+    generique:      { tag:'Générique',       color:'slate',  icon:'⚙️', gradient:'linear-gradient(135deg,#0d1117,#1e2432)' },
+    autre:          { tag:'Autre',           color:'gray',   icon:'❓',  gradient:'linear-gradient(135deg,#111111,#252525)' },
+    pirates:        { tag:'Pirates',         color:'teal',   icon:'⚓',  gradient:'linear-gradient(135deg,#001014,#002535)' },
+    sciencefantasy: { tag:'Sci-Fantasy',     color:'indigo', icon:'🔮',  gradient:'linear-gradient(135deg,#08001a,#180040)' },
+  };
+
+  let rows = [], currentIndex = 0, selectedItem = null, isSaving = false;
+
+  openBtn.addEventListener('click', () => { overlay.hidden = false; resetModal(); });
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  function closeModal() { overlay.hidden = true; resetModal(); }
+
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    fileLabel.textContent = f ? f.name : 'Aucun fichier';
+    startBtn.disabled = !f;
+  });
+
+  startBtn.addEventListener('click', async () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    startBtn.disabled = true;
+    statusEl.textContent = '';
+    doneEl.hidden = true;
+    resultsEl.innerHTML = '';
+    progressEl.hidden = true;
+
+    try {
+      if (typeof XLSX === 'undefined') throw new Error('SheetJS non chargé — vérifiez la connexion internet.');
+      const ab    = await f.arrayBuffer();
+      const wb    = XLSX.read(ab, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw   = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      const normalize = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      const colMap = {};
+      if (raw.length) {
+        for (const k of Object.keys(raw[0])) {
+          const n = normalize(k);
+          if (n === 'gamme')   colMap.gamme   = k;
+          if (n === 'systeme') colMap.systeme = k;
+          if (n === 'livre')   colMap.livre   = k;
+        }
+      }
+      if (!colMap.gamme && !colMap.systeme && !colMap.livre) {
+        statusEl.textContent = '❌ Colonnes "gamme", "systeme", "livre" introuvables dans la 1ère feuille.';
+        startBtn.disabled = false;
+        return;
+      }
+
+      rows = raw
+        .map(r => ({
+          gamme:   String(r[colMap.gamme]   || '').trim(),
+          systeme: String(r[colMap.systeme] || '').trim(),
+          livre:   String(r[colMap.livre]   || '').trim(),
+        }))
+        .filter(r => r.gamme || r.systeme || r.livre);
+
+      if (!rows.length) {
+        statusEl.textContent = '⚠ Aucune ligne valide.';
+        startBtn.disabled = false;
+        return;
+      }
+
+      progressEl.hidden = false;
+      currentIndex = 0;
+      await processRow(0);
+    } catch (err) {
+      statusEl.textContent = '❌ ' + err.message;
+      startBtn.disabled = false;
+    }
+  });
+
+  skipBtn.addEventListener('click', () => nextRow());
+
+  saveBtn.addEventListener('click', async () => {
+    if (!selectedItem || isSaving) return;
+    isSaving = true;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Enregistrement…';
+
+    const row  = rows[currentIndex];
+    const data = selectedItem;
+
+    try {
+      let coverBase64 = null;
+      if (data.cover) {
+        try {
+          const pr = await fetch('/api/proxy-cover?url=' + encodeURIComponent(data.cover));
+          const pd = await pr.json();
+          if (pd.ok) coverBase64 = pd.base64;
+        } catch (_) {}
+      }
+      const catInfo = CAT_MAP[data.category] || CAT_MAP['autre'];
+      const item = {
+        id:          genId('game'),
+        title:       data.title,
+        category:    data.category,
+        tag:         catInfo.tag,
+        tagColor:    catInfo.color,
+        icon:        catInfo.icon,
+        gradient:    catInfo.gradient,
+        image:       coverBase64 || null,
+        description: data.description || '',
+        badges:      [row.gamme, row.systeme].filter(Boolean),
+        popular:     false
+      };
+      prepend(KEYS.games, item);
+      logNotification('game_added', `Nouveau jeu de rôle : « ${item.title} »`, [], '#jeux');
+      renderGames();
+      showToast(`« ${item.title} » ajouté !`);
+    } catch (err) {
+      showToast('Erreur : ' + err.message, true);
+    } finally {
+      isSaving = false;
+      saveBtn.textContent = '💾 Enregistrer';
+      nextRow();
+    }
+  });
+
+  async function doSearch(q) {
+    selectedItem = null;
+    saveBtn.disabled = true;
+    skipBtn.disabled = true;
+    researchBtn.disabled = true;
+    statusEl.textContent = '⏳ Recherche en cours…';
+    renderLoadingPlaceholder();
+
+    try {
+      const params = new URLSearchParams({ q });
+      const res    = await fetch('/api/search-jdr-item?' + params);
+      const data   = await res.json();
+      statusEl.textContent = '';
+
+      if (!data.ok) {
+        renderChoices({ philibert: [], bbe: [], myludo: [] });
+        statusEl.textContent = '❌ ' + (data.error || 'Erreur serveur');
+      } else {
+        renderChoices(data.groups || { philibert: [], bbe: [], myludo: [] });
+      }
+    } catch (err) {
+      renderChoices({ philibert: [], bbe: [], myludo: [] });
+      statusEl.textContent = '❌ ' + err.message;
+    } finally {
+      skipBtn.disabled = false;
+      researchBtn.disabled = false;
+    }
+  }
+
+  researchBtn.addEventListener('click', () => {
+    const q = queryEl.value.trim();
+    if (q) doSearch(q);
+  });
+
+  queryEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); const q = queryEl.value.trim(); if (q) doSearch(q); }
+  });
+
+  async function processRow(index) {
+    currentIndex = index;
+    selectedItem = null;
+    saveBtn.disabled = true;
+    skipBtn.disabled = true;
+    statusEl.textContent = '';
+    resultsEl.innerHTML = '';
+
+    if (index >= rows.length) {
+      progressEl.hidden = true;
+      doneEl.hidden = false;
+      statusEl.textContent = `✅ ${rows.length} article(s) traité(s).`;
+      startBtn.disabled = false;
+      return;
+    }
+
+    const row   = rows[index];
+    const query = [row.gamme, row.livre].filter(Boolean).join(' ') || row.systeme;
+
+    counterEl.textContent = `Article ${index + 1} / ${rows.length}`;
+    queryEl.value         = query;
+    barEl.style.width     = Math.round((index / rows.length) * 100) + '%';
+
+    await doSearch(query);
+  }
+
+  function renderLoadingPlaceholder() {
+    resultsEl.innerHTML = '';
+    for (const { label, cls } of SOURCES) {
+      const section = document.createElement('div');
+      section.className = 'excel-source-section';
+      section.innerHTML = `
+        <div class="excel-source-header ${cls}">${esc(label)}</div>
+        <div class="excel-source-row excel-source-loading">
+          <span class="excel-source-spinner">⏳ Chargement…</span>
+        </div>`;
+      resultsEl.appendChild(section);
+    }
+  }
+
+  const SOURCES = [
+    { key: 'philibert', label: 'Philibert',           cls: 'src-phil'   },
+    { key: 'bbe',       label: 'Black Book Éditions',  cls: 'src-bbe'    },
+    { key: 'myludo',    label: 'MyLudo',               cls: 'src-myludo' }
+  ];
+
+  function renderChoices(groups) {
+    resultsEl.innerHTML = '';
+    for (const { key, label, cls } of SOURCES) {
+      const group = groups[key] || { items: [], error: null };
+      const items = group.items || [];
+
+      const section = document.createElement('div');
+      section.className = 'excel-source-section';
+
+      const hdr = document.createElement('div');
+      hdr.className = `excel-source-header ${cls}`;
+      hdr.innerHTML = `${esc(label)}${items.length ? ` <span class="excel-source-count">${items.length}</span>` : ''}`;
+      section.appendChild(hdr);
+
+      const row = document.createElement('div');
+      row.className = 'excel-source-row';
+
+      if (!items.length) {
+        const msg = group.error
+          ? `⚠ Indisponible (${esc(group.error.slice(0, 60))})`
+          : 'Aucun résultat pour cette recherche';
+        row.innerHTML = `<span class="excel-source-empty">${msg}</span>`;
+      } else {
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'excel-choice-card';
+          card.innerHTML = `
+            <div class="excel-choice-img">
+              ${item.cover
+                ? `<img src="${esc(item.cover)}" alt="${esc(item.title)}" loading="lazy">`
+                : '<div class="excel-card-no-img">🎲</div>'}
+            </div>
+            <div class="excel-choice-title" title="${esc(item.title)}">${esc(item.title)}</div>
+            ${item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" class="excel-choice-link">&#128279; Voir</a>` : ''}
+          `;
+          card.addEventListener('click', e => {
+            if (e.target.tagName === 'A') return;
+            resultsEl.querySelectorAll('.excel-choice-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedItem = item;
+            saveBtn.disabled = false;
+          });
+          row.appendChild(card);
+        });
+      }
+
+      section.appendChild(row);
+      resultsEl.appendChild(section);
+    }
+  }
+
+  function nextRow() { processRow(currentIndex + 1); }
+
+  function resetModal() {
+    fileInput.value       = '';
+    fileLabel.textContent = 'Aucun fichier';
+    startBtn.disabled     = true;
+    skipBtn.disabled      = true;
+    saveBtn.disabled      = true;
+    progressEl.hidden     = true;
+    doneEl.hidden         = true;
+    resultsEl.innerHTML   = '';
+    statusEl.textContent  = '';
+    rows = []; currentIndex = 0; selectedItem = null; isSaving = false;
+  }
+}
+
+/* ─── Wishlist export (Excel) ────────────────────────────────────── */
+function bindWishlistExport() {
+  const btn = document.getElementById('wishlist-export-btn');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    if (typeof XLSX === 'undefined') { showToast('Bibliothèque XLSX non chargée.', true); return; }
+
+    let items = _wishlistItems;
+    if (!items.length) {
+      try {
+        const r = await fetch('/api/wishlist');
+        items = await r.json();
+      } catch (_) {}
+    }
+    if (!items.length) { showToast('La wishlist est vide.', true); return; }
+
+    const GENRE_LABELS = {
+      jdr:'Jeu de Rôle', jds:'Jeu de société', roman:'Roman', bd:'BD',
+      manga:'Manga', artbook:'Artbook', accessoire:'Accessoire', autre:'Autre'
+    };
+
+    const rows = items.map(w => ({
+      'Titre':            w.title       || '',
+      'Auteur':           w.author      || '',
+      'Éditeur':          w.publisher   || '',
+      'Genre':            GENRE_LABELS[w.genre] || w.genre || '',
+      'Tags':             (w.tags || []).join(', '),
+      'URL':              w.url         || '',
+      'Date d\'ajout':    w.addedAt ? new Date(w.addedAt).toLocaleDateString('fr-FR') : ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 45 }, { wch: 30 }, { wch: 25 }, { wch: 18 },
+      { wch: 25 }, { wch: 50 }, { wch: 14 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Wishlist');
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `wishlist_${date}.xlsx`);
+    showToast(`${items.length} article(s) exporté(s).`);
+  });
+}
+
 /* ─── Populate games multi-select from catalog ───────────────────── */
 function populateGamesSelect(selectedGames) {
   const sel = document.getElementById('games-select');
@@ -1055,9 +1442,11 @@ function bindMemberTypeToggle() {
 function renderAll() {
   renderEvents();
   renderGames();
+  renderWishlist();
   renderTeam();
   renderBlog();
   renderLibrary();
+  renderParties();
   renderCompta();
   renderAgenda();
   renderSite();
@@ -1473,6 +1862,170 @@ function cancelEventEdit() {
   form.querySelector('button[type="submit"]').textContent = 'Ajouter l\'événement';
   const cancelBtn = form.querySelector('.btn-cancel-edit');
   if (cancelBtn) cancelBtn.remove();
+}
+
+/* ─── Wishlist ───────────────────────────────────────────────────── */
+let _wishlistItems   = [];
+let _wishlistEditId  = null;
+
+async function renderWishlist() {
+  const list  = document.getElementById('list-wishlist');
+  const count = document.getElementById('count-wishlist');
+  if (!list) return;
+
+  try {
+    const r = await fetch('/api/wishlist');
+    _wishlistItems = await r.json();
+  } catch (_) { _wishlistItems = []; }
+
+  count.textContent = _wishlistItems.length;
+
+  if (!_wishlistItems.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun article en wishlist.</p>';
+    _wishlistClearEditor();
+    return;
+  }
+
+  list.innerHTML = _wishlistItems.map(item => {
+    const TAG_COLOR = { 'Achat approuvé': 'badge-green', 'Arrivée imminente': 'badge-blue' };
+    const tagsHtml = (item.tags || []).length
+      ? `<div class="admin-item-badges" style="margin-top:.3rem;">${item.tags.map(t => `<span class="admin-item-badge ${TAG_COLOR[t] || 'badge-amber'}">${esc(t)}</span>`).join('')}</div>`
+      : '';
+    return `
+    <div class="admin-item wishlist-item${String(item.id) === String(_wishlistEditId) ? ' wishlist-item--selected' : ''}" data-id="${item.id}">
+      ${item.cover ? `<img class="wishlist-thumb" src="${esc(item.cover)}" alt="" loading="lazy">` : '<div class="wishlist-thumb-empty">🎲</div>'}
+      <div class="admin-item-info" style="flex:1;min-width:0;">
+        <div class="admin-item-title">${esc(item.title)}</div>
+        <div class="admin-item-badges">
+          ${item.source    ? `<span class="admin-item-badge badge-slate">${esc(item.source)}</span>` : ''}
+          ${item.publisher ? `<span class="admin-item-badge badge-slate">${esc(item.publisher)}</span>` : ''}
+          ${item.genre     ? `<span class="admin-item-badge badge-blue">${esc(item.genre)}</span>` : ''}
+        </div>
+        ${tagsHtml}
+        ${item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" class="wishlist-link">&#128279; Voir</a>` : ''}
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn-edit"   data-wishlist-edit="${item.id}">Tags</button>
+        <button class="btn-danger" data-wishlist-delete="${item.id}">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.btn-edit[data-wishlist-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.wishlistEdit;
+      const item = _wishlistItems.find(i => String(i.id) === String(id));
+      if (item) _wishlistOpenEditor(item);
+    });
+  });
+
+  list.querySelectorAll('.btn-danger[data-wishlist-delete]').forEach(btn => {
+    btn.addEventListener('click', () => _wishlistDeleteItem(btn.dataset.wishlistDelete));
+  });
+}
+
+function _wishlistClearEditor() {
+  _wishlistEditId = null;
+  const noSel = document.getElementById('wishlist-no-selection');
+  const form  = document.getElementById('wishlist-tag-form');
+  if (noSel) noSel.style.display = '';
+  if (form)  form.style.display  = 'none';
+}
+
+function _wishlistOpenEditor(item) {
+  _wishlistEditId = item.id;
+
+  const noSel   = document.getElementById('wishlist-no-selection');
+  const form    = document.getElementById('wishlist-tag-form');
+  const preview = document.getElementById('wishlist-editor-preview');
+  if (!form) return;
+
+  noSel.style.display = 'none';
+  form.style.display  = '';
+
+  // Mettre à jour la sélection visuelle dans la liste
+  document.querySelectorAll('#list-wishlist .admin-item').forEach(el => {
+    el.classList.toggle('wishlist-item--selected', String(el.dataset.id) === String(item.id));
+  });
+
+  // Aperçu de l'article
+  preview.innerHTML = `
+    <div class="wishlist-editor-card">
+      ${item.cover
+        ? `<img src="${esc(item.cover)}" alt="" class="wishlist-editor-thumb">`
+        : `<div class="wishlist-editor-thumb-empty">🎲</div>`}
+      <div class="wishlist-editor-info">
+        <div class="wishlist-editor-title">${esc(item.title)}</div>
+        ${item.author    ? `<div class="wishlist-editor-meta">${esc(item.author)}</div>` : ''}
+        ${item.publisher ? `<div class="wishlist-editor-meta">${esc(item.publisher)}</div>` : ''}
+        ${item.source    ? `<span class="admin-item-badge badge-slate">${esc(item.source)}</span>` : ''}
+      </div>
+    </div>`;
+
+  // Charger les tags existants
+  _wishlistSetTags(item.tags || []);
+}
+
+const WISHLIST_TAGS = ['Achat approuvé', 'Arrivée imminente'];
+
+function _wishlistSetTags(tags) {
+  const cbAchat   = document.getElementById('wtag-achat');
+  const cbArrivee = document.getElementById('wtag-arrivee');
+  if (cbAchat)   cbAchat.checked   = (tags || []).includes('Achat approuvé');
+  if (cbArrivee) cbArrivee.checked = (tags || []).includes('Arrivée imminente');
+}
+
+function _wishlistGetTags() {
+  const tags = [];
+  if (document.getElementById('wtag-achat')?.checked)   tags.push('Achat approuvé');
+  if (document.getElementById('wtag-arrivee')?.checked) tags.push('Arrivée imminente');
+  return tags;
+}
+
+function _wishlistDeleteItem(id) {
+  const item = _wishlistItems.find(i => String(i.id) === String(id));
+  const name = item ? item.title : '';
+  showConfirm(name ? `Supprimer « ${name} » de la wishlist ?` : 'Confirmer la suppression ?', async () => {
+    try {
+      await fetch(`/api/wishlist/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      if (String(_wishlistEditId) === String(id)) _wishlistClearEditor();
+      await renderWishlist();
+      showToast('Article retiré de la wishlist.');
+    } catch (err) {
+      showToast('Erreur : ' + err.message, true);
+    }
+  });
+}
+
+function bindWishlistTagEditor() {
+  const saveBtn = document.getElementById('wishlist-tags-save');
+  const delBtn  = document.getElementById('wishlist-tags-delete');
+  if (!saveBtn) return;
+
+  saveBtn.addEventListener('click', async () => {
+    if (!_wishlistEditId) return;
+    const tags = _wishlistGetTags();
+    try {
+      const r = await fetch(`/api/wishlist/${_wishlistEditId}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ tags })
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'Erreur serveur');
+      const idx = _wishlistItems.findIndex(i => String(i.id) === String(_wishlistEditId));
+      if (idx !== -1) _wishlistItems[idx].tags = tags;
+      await renderWishlist();
+      showToast('Tags enregistrés !');
+    } catch (err) {
+      showToast('Erreur : ' + err.message, true);
+    }
+  });
+
+  delBtn?.addEventListener('click', () => {
+    if (!_wishlistEditId) return;
+    _wishlistDeleteItem(_wishlistEditId);
+  });
 }
 
 /* ─── Games list ─────────────────────────────────────────────────── */
@@ -3378,4 +3931,316 @@ function bindBackupRestore() {
       );
     });
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATISTIQUES
+═══════════════════════════════════════════════════════════════════ */
+const EVT_MONTH_MAP = {
+  'janvier':1,'février':2,'fevrier':2,'mars':3,'avril':4,'mai':5,'juin':6,
+  'juillet':7,'août':8,'aout':8,'septembre':9,'octobre':10,'novembre':11,'décembre':12,'decembre':12
+};
+
+function _evtToDate(item) {
+  const d = parseInt(item.startDay, 10);
+  const m = EVT_MONTH_MAP[(item.startMonth || '').toLowerCase().trim()];
+  const y = parseInt(item.startYear, 10);
+  if (!d || !m || !y) return null;
+  return new Date(y, m - 1, d);
+}
+
+function _inRange(dateStr, from, to) {
+  if (!dateStr) return false;
+  return dateStr >= from && dateStr <= to;
+}
+
+function _topN(arr, key, n = 8) {
+  const counts = {};
+  arr.forEach(item => {
+    const v = (item[key] || '—').trim();
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n);
+}
+
+function _barRows(entries, max) {
+  return entries.map(([label, count]) => `
+    <div class="stats-bar-row">
+      <span class="stats-bar-label" title="${esc(label)}">${esc(label)}</span>
+      <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${Math.round(count/max*100)}%"></div></div>
+      <span class="stats-bar-count">${count}</span>
+    </div>`).join('');
+}
+
+function _kpiCard(label, value, sub, cls) {
+  return `<div class="stats-kpi-card${cls ? ' ' + cls : ''}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+function renderStats() {
+  const fromEl = document.getElementById('stats-date-from');
+  const toEl   = document.getElementById('stats-date-to');
+  const out    = document.getElementById('stats-output');
+  if (!out) return;
+  const from = fromEl ? fromEl.value : '';
+  const to   = toEl   ? toEl.value   : '';
+  if (!from || !to) { out.innerHTML = '<p class="stats-empty">Sélectionnez une période et cliquez sur Calculer.</p>'; return; }
+  if (from > to) { out.innerHTML = '<p class="stats-empty">La date de début doit être antérieure à la date de fin.</p>'; return; }
+
+  /* ── Parties ── */
+  const parties = getData(KEYS.parties).filter(p => _inRange(p.date, from, to));
+  const totalJoueurs = parties.reduce((s, p) => s + (parseInt(p.nbJoueurs, 10) || 0), 0);
+  const avgJoueurs   = parties.length ? (totalJoueurs / parties.length).toFixed(1) : 0;
+  const topJdr  = _topN(parties, 'jdr');
+  const topMJ   = _topN(parties, 'mj');
+  const topLieu = _topN(parties, 'lieu');
+
+  /* ── Événements ── */
+  const events = getData(KEYS.events).filter(evt => {
+    const d = _evtToDate(evt);
+    if (!d) return false;
+    const ds = d.toISOString().slice(0, 10);
+    return ds >= from && ds <= to;
+  });
+
+  /* ── Comptabilité ── */
+  const compta = getData(KEYS.compta).filter(c => _inRange(c.date, from, to));
+  const recettes = compta.filter(c => c.type === 'recette');
+  const depenses = compta.filter(c => c.type === 'depense');
+  const totalRec = recettes.reduce((s, c) => s + (parseFloat(c.montant) || 0), 0);
+  const totalDep = depenses.reduce((s, c) => s + (parseFloat(c.montant) || 0), 0);
+  const solde    = totalRec - totalDep;
+  const articlesAchetes = depenses.filter(c => c.categorie === 'materiel');
+
+  /* ── Agrégats compta par catégorie ── */
+  function byCategorie(items) {
+    const map = {};
+    items.forEach(c => {
+      const k = c.categorie || 'autre';
+      map[k] = (map[k] || 0) + (parseFloat(c.montant) || 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }
+  const recByCat = byCategorie(recettes);
+  const depByCat = byCategorie(depenses);
+
+  /* ── Rendu ── */
+  const fmt = v => v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  const maxJdr = topJdr[0] ? topJdr[0][1] : 1;
+  const maxMJ  = topMJ[0]  ? topMJ[0][1]  : 1;
+  const maxLieu = topLieu[0] ? topLieu[0][1] : 1;
+
+  out.innerHTML = `
+    <div class="stats-kpi-grid">
+      ${_kpiCard('Parties jouées',    parties.length,       parties.length ? `${totalJoueurs} joueur(s) au total` : '')}
+      ${_kpiCard('Moy. joueurs/partie', parties.length ? avgJoueurs : '—', parties.length ? `max ${Math.max(...parties.map(p=>p.nbJoueurs||0))} joueurs` : '')}
+      ${_kpiCard('Systèmes JdR',      new Set(parties.map(p => p.jdr)).size, '')}
+      ${_kpiCard('Événements',        events.length,        '')}
+      ${_kpiCard('Recettes',          fmt(totalRec),        `${recettes.length} entrée(s)`, 'kpi--green')}
+      ${_kpiCard('Dépenses',          fmt(totalDep),        `${depenses.length} entrée(s)`, 'kpi--red')}
+      ${_kpiCard('Solde',             fmt(solde),           '', solde >= 0 ? 'kpi--green' : 'kpi--red')}
+      ${_kpiCard('Articles achetés',  articlesAchetes.length, articlesAchetes.length ? fmt(articlesAchetes.reduce((s,c)=>s+(parseFloat(c.montant)||0),0)) : '', 'kpi--accent')}
+    </div>
+
+    <div class="stats-breakdown">
+      <div class="stats-block">
+        <h4>🎲 Top JdR joués</h4>
+        ${topJdr.length ? _barRows(topJdr, maxJdr) : '<p class="stats-empty">Aucune donnée</p>'}
+      </div>
+      <div class="stats-block">
+        <h4>🧙 Top MJ</h4>
+        ${topMJ.length ? _barRows(topMJ, maxMJ) : '<p class="stats-empty">Aucune donnée</p>'}
+      </div>
+    </div>
+
+    <div class="stats-breakdown">
+      <div class="stats-block">
+        <h4>📍 Top lieux</h4>
+        ${topLieu.length ? _barRows(topLieu, maxLieu) : '<p class="stats-empty">Aucune donnée</p>'}
+      </div>
+      <div class="stats-block">
+        <h4>📅 Événements (${events.length})</h4>
+        ${events.length ? events.slice(0, 8).map(e => `
+          <div class="stats-bar-row">
+            <span class="stats-bar-label">${esc(e.title)}</span>
+            <span class="stats-bar-count" style="color:var(--text-muted);font-size:.78rem">${esc(e.startDay)} ${esc(e.startMonth)} ${esc(e.startYear)}</span>
+          </div>`).join('') : '<p class="stats-empty">Aucun événement</p>'}
+      </div>
+    </div>
+
+    <div class="stats-breakdown">
+      <div class="stats-block">
+        <h4>💰 Recettes par catégorie</h4>
+        ${recByCat.length ? recByCat.map(([cat, amt]) => `
+          <div class="stats-compta-row">
+            <span class="sc-label">${esc(COMPTA_CAT_LABELS[cat] || cat)}</span>
+            <span class="sc-amount sc-amount--rec">+${fmt(amt)}</span>
+          </div>`).join('') : '<p class="stats-empty">Aucune recette</p>'}
+      </div>
+      <div class="stats-block">
+        <h4>💸 Dépenses par catégorie</h4>
+        ${depByCat.length ? depByCat.map(([cat, amt]) => `
+          <div class="stats-compta-row">
+            <span class="sc-label">${esc(COMPTA_CAT_LABELS[cat] || cat)}</span>
+            <span class="sc-amount sc-amount--dep">-${fmt(amt)}</span>
+          </div>`).join('') : '<p class="stats-empty">Aucune dépense</p>'}
+      </div>
+    </div>
+
+    ${articlesAchetes.length ? `
+    <div class="stats-block" style="margin-bottom:1.5rem">
+      <h4>🛒 Détail articles achetés (Matériel / Jeux)</h4>
+      ${articlesAchetes.map(c => `
+        <div class="stats-compta-row">
+          <span class="sc-label">${esc(c.libelle || '—')}${c.notes ? ` <span style="color:var(--text-muted);font-size:.8rem">— ${esc(c.notes)}</span>` : ''}</span>
+          <span class="sc-amount sc-amount--dep">${fmt(parseFloat(c.montant)||0)} <span style="font-size:.78rem;color:var(--text-muted)">${esc(c.date||'')}</span></span>
+        </div>`).join('')}
+    </div>` : ''}
+  `;
+}
+
+function bindStatsForm() {
+  const btn    = document.getElementById('stats-calc-btn');
+  const fromEl = document.getElementById('stats-date-from');
+  const toEl   = document.getElementById('stats-date-to');
+  if (!btn) return;
+
+  // Défaut : année courante
+  const now = new Date();
+  const y   = now.getFullYear();
+  if (fromEl) fromEl.value = `${y}-01-01`;
+  if (toEl)   toEl.value   = `${y}-12-31`;
+
+  btn.addEventListener('click', renderStats);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PARTIES
+═══════════════════════════════════════════════════════════════════ */
+let _editingPartieId = null;
+
+const MOIS_FR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+function _formatDatePartie(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return `${d.getDate()} ${MOIS_FR[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function renderParties() {
+  const items = getData(KEYS.parties).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const list  = document.getElementById('list-parties');
+  const count = document.getElementById('count-parties');
+  if (!list) return;
+  count.textContent = items.length;
+
+  if (!items.length) {
+    list.innerHTML = '<p class="admin-empty">Aucune partie enregistrée.</p>';
+    return;
+  }
+
+  list.innerHTML = items.map(item => `
+    <div class="admin-item">
+      <div class="admin-item-row">
+        <div class="admin-item-info">
+          <div class="admin-item-title">${esc(item.jdr)}${item.scenario ? ` — <em>${esc(item.scenario)}</em>` : ''}</div>
+          <div class="admin-item-meta">
+            ${_formatDatePartie(item.date)} &nbsp;·&nbsp; MJ : ${esc(item.mj)} &nbsp;·&nbsp; ${esc(String(item.nbJoueurs))} joueur(s) &nbsp;·&nbsp; ${esc(item.lieu || '')}
+            ${item.joueurs ? `<br><span style="font-size:.8rem;color:var(--text-muted)">${esc(item.joueurs)}</span>` : ''}
+          </div>
+          ${item.commentaire ? `<div class="admin-item-meta" style="font-style:italic;margin-top:.25rem">${esc(item.commentaire)}</div>` : ''}
+        </div>
+        <div class="admin-item-actions">
+          <button class="btn-edit" data-edit-partie="${esc(item.id)}">Modifier</button>
+          <button class="btn-danger" data-delete-partie="${esc(item.id)}">Supprimer</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  list.querySelectorAll('.btn-edit[data-edit-partie]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = getData(KEYS.parties).find(p => p.id === btn.dataset.editPartie);
+      if (item) _populatePartieForm(item);
+    });
+  });
+
+  list.querySelectorAll('.btn-danger[data-delete-partie]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm('Supprimer cette partie ?')) return;
+      const arr = getData(KEYS.parties).filter(p => p.id !== btn.dataset.deletePartie);
+      saveData(KEYS.parties, arr);
+      renderParties();
+      showToast('Partie supprimée.');
+    });
+  });
+}
+
+function _populatePartieForm(item) {
+  _editingPartieId = item.id;
+  const form = document.getElementById('form-parties');
+  const set  = (name, val) => { const el = form.querySelector(`[name="${name}"]`); if (el) el.value = val ?? ''; };
+  set('jdr',         item.jdr);
+  set('scenario',    item.scenario);
+  set('date',        item.date);
+  set('mj',          item.mj);
+  set('lieu',        item.lieu);
+  set('nbJoueurs',   item.nbJoueurs);
+  set('joueurs',     item.joueurs);
+  set('commentaire', item.commentaire);
+  document.getElementById('parties-form-title').textContent = 'Modifier la partie';
+  document.getElementById('parties-submit-btn').textContent = 'Enregistrer les modifications';
+  document.getElementById('parties-cancel-btn').style.display = '';
+  form.querySelector('[name="jdr"]').focus();
+}
+
+function _cancelPartieEdit() {
+  _editingPartieId = null;
+  document.getElementById('form-parties').reset();
+  document.getElementById('parties-form-title').textContent = 'Nouvelle partie';
+  document.getElementById('parties-submit-btn').textContent = '+ Enregistrer la partie';
+  document.getElementById('parties-cancel-btn').style.display = 'none';
+}
+
+function bindPartiesForm() {
+  const form = document.getElementById('form-parties');
+  if (!form) return;
+
+  document.getElementById('parties-cancel-btn').addEventListener('click', _cancelPartieEdit);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const d = collectForm(form);
+    if (!d.jdr || !d.date || !d.mj || !d.nbJoueurs || !d.lieu) {
+      showToast('Merci de remplir les champs obligatoires (*)', true);
+      return;
+    }
+
+    const fields = {
+      jdr:         d.jdr.trim(),
+      scenario:    (d.scenario || '').trim(),
+      date:        d.date,
+      mj:          d.mj.trim(),
+      lieu:        d.lieu.trim(),
+      nbJoueurs:   parseInt(d.nbJoueurs, 10) || 1,
+      joueurs:     (d.joueurs || '').trim(),
+      commentaire: (d.commentaire || '').trim()
+    };
+
+    if (_editingPartieId) {
+      const arr = getData(KEYS.parties).map(p => p.id === _editingPartieId ? { ...p, ...fields } : p);
+      saveData(KEYS.parties, arr);
+      _cancelPartieEdit();
+      showToast('Partie modifiée !');
+    } else {
+      const item = { id: genId('partie'), createdAt: new Date().toISOString(), ...fields };
+      prepend(KEYS.parties, item);
+      form.reset();
+      showToast('Partie enregistrée !');
+    }
+    renderParties();
+  });
 }
