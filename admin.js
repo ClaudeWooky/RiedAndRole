@@ -981,7 +981,7 @@ function bindMyLudoImport() {
     status.style.display = 'none';
 
     try {
-      const res  = await fetch('/api/scrape-myludo?url=' + encodeURIComponent(url));
+      const res  = await fetch('/api/scrape-myludo?url=' + encodeURIComponent(url), { headers: getAuthHeaders() });
       const data = await res.json();
 
       if (!data.ok) {

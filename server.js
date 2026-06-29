@@ -1710,102 +1710,42 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        // Extraire l'ID numérique depuis l'URL MyLudo
-        // Formats: #!/jeu/nom-du-jeu-12345  ou  /#!/fiche/12345  ou juste un ID
-        const idMatch = rawUrl.match(/[-\/](\d+)\s*$/) || rawUrl.match(/\/(\d+)/);
-        const gameId  = idMatch ? idMatch[1] : null;
+        // Extraire le slug/code depuis l'URL  (ex: #!/jeu/cthulhu-jdr-5143)
+        const codeMatch = rawUrl.match(/(?:jeu|game)\/([^#?\s]+)/);
+        const slug      = codeMatch ? codeMatch[1] : null;
 
-        // Construire les URLs à essayer
-        const slugMatch = rawUrl.match(/jeu\/([^#?\s]+)/);
-        const slug      = slugMatch ? slugMatch[1] : null;
-
-        let gameData = null;
-
-        // 1. Essayer l'API JSON interne de MyLudo
-        if (gameId) {
-          try {
-            const apiUrl = `https://www.myludo.fr/api/game/${gameId}`;
-            const { status, body } = await fetchExternal(apiUrl, {
-              'Accept': 'application/json',
-              'Referer': 'https://www.myludo.fr/'
-            }, 8000);
-            if (status === 200) {
-              const json = JSON.parse(body);
-              // MyLudo retourne { game: { name, description, cover, ... } } ou directement les champs
-              const g = json.game || json;
-              if (g && (g.name || g.title)) {
-                gameData = {
-                  title:       g.name || g.title || '',
-                  description: (g.description || g.summary || '').replace(/<[^>]+>/g, '').trim(),
-                  cover:       g.cover || g.image || g.cover_url || null,
-                  nbPlayers:   g.nb_players_min && g.nb_players_max
-                                 ? `${g.nb_players_min}–${g.nb_players_max} joueurs` : null,
-                  duration:    g.duration_min ? `${g.duration_min} min` : null,
-                  age:         g.age ? `Dès ${g.age} ans` : null,
-                  designers:   Array.isArray(g.designers) ? g.designers.map(d => d.name || d).join(', ') : null,
-                  publishers:  Array.isArray(g.publishers) ? g.publishers.map(p => p.name || p).join(', ') : null,
-                  myludo_url:  `https://www.myludo.fr/#!/jeu/${slug || gameId}`
-                };
-              }
-            }
-          } catch (_) { /* API non disponible, on continue */ }
-        }
-
-        // 2. Si l'API a échoué, parser la page HTML pour les meta OG
-        if (!gameData) {
-          const pageUrl = slug
-            ? `https://www.myludo.fr/jeu/${slug}`
-            : (gameId ? `https://www.myludo.fr/jeu/${gameId}` : rawUrl.replace('#!/', ''));
-          const { status, body: html } = await fetchExternal(pageUrl, {
-            'Accept': 'text/html,application/xhtml+xml',
-            'Referer': 'https://www.myludo.fr/'
-          }, 10000);
-
-          if (status === 200 && html.length > 100) {
-            const getMeta = (prop) => {
-              const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, 'i'))
-                     || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, 'i'));
-              return m ? m[1].replace(/&amp;/g, '&').replace(/&#039;/g, "'").trim() : null;
-            };
-
-            const title = getMeta('og:title')
-                       || (html.match(/<title[^>]*>([^<]+)<\/title>/i) || [])[1]?.replace(/ [–-] MyLudo.*$/i,'').trim()
-                       || null;
-            const desc  = getMeta('og:description')
-                       || getMeta('description')
-                       || null;
-            const cover = getMeta('og:image') || null;
-
-            // Chercher du JSON-LD (schema.org)
-            let ldTitle = null, ldDesc = null, ldImg = null;
-            const ldMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
-            if (ldMatch) {
-              try {
-                const ld = JSON.parse(ldMatch[1]);
-                ldTitle = ld.name || ld.headline || null;
-                ldDesc  = ld.description || null;
-                ldImg   = ld.image?.url || ld.image || null;
-              } catch (_) {}
-            }
-
-            if (title || desc || cover) {
-              gameData = {
-                title:      ldTitle || title || '',
-                description:(ldDesc  || desc  || '').replace(/<[^>]+>/g, '').trim().slice(0, 800),
-                cover:      ldImg   || cover  || null,
-                myludo_url: rawUrl
-              };
-            }
-          }
-        }
-
-        if (!gameData) {
+        if (!slug) {
           res.writeHead(200, JSON_HDR);
-          res.end(JSON.stringify({ ok: false, error: 'Impossible de récupérer les données de cette page MyLudo. Vérifiez l\'URL.' }));
+          res.end(JSON.stringify({ ok: false, error: 'URL MyLudo non reconnue. Format attendu : https://www.myludo.fr/#!/jeu/nom-du-jeu' }));
           return;
         }
 
-        // 3. Télécharger l'image et la convertir en base64
+        // Construire la requête de recherche à partir du slug
+        const searchQuery = slug.replace(/-\d+$/, '').replace(/-/g, ' ').trim().split(' ').slice(0, 5).join(' ');
+
+        // Utiliser searchMyLudo (gestion CSRF + cookie déjà intégrée)
+        const results = await searchMyLudo(searchQuery);
+
+        // Trouver la meilleure correspondance : slug exact d'abord, sinon premier résultat
+        const match = results.find(r => r.url && r.url.includes(slug)) || results[0];
+
+        if (!match) {
+          res.writeHead(200, JSON_HDR);
+          res.end(JSON.stringify({ ok: false, error: 'Jeu non trouvé sur MyLudo. Vérifiez l\'URL.' }));
+          return;
+        }
+
+        const gameData = {
+          title:       match.title      || '',
+          description: match.description || '',
+          cover:       match.cover      || null,
+          designers:   match.author     || null,
+          publishers:  match.publisher  || null,
+          year:        match.year       || null,
+          myludo_url:  match.url        || rawUrl
+        };
+
+        // Télécharger l'image de couverture en base64
         if (gameData.cover) {
           try {
             const imgUrl = gameData.cover.startsWith('//') ? 'https:' + gameData.cover : gameData.cover;
