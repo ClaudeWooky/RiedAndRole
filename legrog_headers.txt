@@ -1,8 +1,0 @@
-HTTP/1.1 302 Moved Temporarily
-Date: Sun, 31 May 2026 08:25:33 GMT
-Server: Apache
-X-Powered-By: Servlet 2.4; JBoss-4.2.3.GA (build: SVNTag=JBoss_4_2_3_GA date=200807181439)/JBossWeb-2.0
-X-Powered-By: JSF/1.2
-Location: https://www.legrog.org/search_results.jsp?cid=68129256
-Content-Length: 0
-

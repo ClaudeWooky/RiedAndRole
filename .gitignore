@@ -16,5 +16,13 @@ data/event_notif_subs.json
 data/comptabilite.json
 data/notif_log.json
 
+# Fichiers de debug de tests manuels de scrapers (curl/headers/HTML bruts)
+legrog_*.txt
+legrog_*.html
+lg_hdr*.txt
+lg_r*.html
+lg_cookies.txt
+lg_form.html
+
 # Dépendances
 node_modules/

@@ -28,3 +28,9 @@ Partie pour Administrateurs: plusieurs pages:
 - Comptabilité: gestion de l'argent: achat de nouveau materiel/livres, subventions, ...
 - Statistiques: Calcul des statistiques pour une certaine période (JdR joués, les lieux utilisés, les événements, les MJ solicités, les achats de materiel, ...)
 - Site: parametres du site, gestion de notifications, analytics, sauvegarde des données, gestion des comptes
+
+Pour la recherche de jeux dans la partie Jeux de role, 2 choix: 
+- manuel: l'utilisateur rentre les informations à la main. A lui de les trouver.
+- Automatique: un scraper va rechercher les informations necessaires sur myLudo grace à un scrapper
+
+- Pour la recherche de jeux dans la partie Wishlist et Bibliothèque, l'application recherche les titres sur Philibert, Black book editions et myLudo grace à des scrappers developpés dans ce but.
