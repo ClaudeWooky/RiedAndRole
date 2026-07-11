@@ -829,6 +829,72 @@ async function applyStatConfig() {
   _statDataReady = true;
   const homeEl = document.getElementById('home');
   if (homeEl && homeEl.classList.contains('active')) runCounters();
+
+  applySiteInfo(cfg);
+}
+
+/* ─── Association info (nom, description, adresse, mail, réseaux) ──── */
+function applySiteInfo(cfg) {
+  const setText = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
+  const setHref = (id, val) => { const el = document.getElementById(id); if (el && val) el.href = val; };
+  const addrHtml = v => v.split(',').map(s => s.trim()).filter(Boolean).join('<br>');
+
+  if (cfg.nomAssociation) {
+    document.querySelectorAll('.js-assoc-name').forEach(el => { el.textContent = cfg.nomAssociation; });
+    document.title = document.title.replace('Ried & Rôle', cfg.nomAssociation);
+
+    const hero = document.getElementById('hero-assoc-name');
+    if (hero) {
+      const m = cfg.nomAssociation.match(/^(.*?)\s*([&+])\s*(.*)$/);
+      hero.innerHTML = m
+        ? `${escHtml(m[1])} <span class="accent">${escHtml(m[2])}</span> ${escHtml(m[3])}`
+        : escHtml(cfg.nomAssociation);
+    }
+  }
+
+  setText('footer-description', cfg.description);
+
+  if (cfg.adresse) {
+    const html = addrHtml(cfg.adresse);
+    const contactAddr = document.getElementById('contact-address');
+    if (contactAddr) contactAddr.innerHTML = html;
+    const footerAddr = document.getElementById('footer-address');
+    if (footerAddr) footerAddr.innerHTML = html;
+    const map = document.getElementById('contact-map');
+    if (map) map.src = `https://www.google.com/maps?q=${encodeURIComponent(cfg.adresse)}&output=embed`;
+  }
+
+  setText('contact-email', cfg.email);
+  setText('footer-email', cfg.email);
+
+  setHref('social-facebook',      cfg.facebookUrl);
+  setHref('social-discord',       cfg.discordUrl);
+  setHref('social-instagram',     cfg.instagramUrl);
+  setHref('social-myludo',        cfg.myludoUrl);
+  setHref('footer-facebook',      cfg.facebookUrl);
+  setHref('footer-discord',       cfg.discordUrl);
+  setHref('footer-instagram',     cfg.instagramUrl);
+  setHref('contact-discord-link', cfg.discordUrl);
+
+  renderCotisations(cfg.cotisations);
+}
+
+function renderCotisations(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  const container = document.getElementById('membership-prices-list');
+  if (container) {
+    container.innerHTML = list.map(c => {
+      const inner = `
+        <span class="mp-type">${escHtml(c.label || '')}</span>
+        <span class="mp-price">${Number(c.prix) || 0} €<span>/an</span></span>`;
+      return c.url
+        ? `<a href="${escHtml(c.url)}" target="_blank" rel="noopener" class="mp-item mp-item-link">${inner}</a>`
+        : `<div class="mp-item">${inner}</div>`;
+    }).join('');
+  }
+  const total = list.reduce((sum, c) => sum + (Number(c.prix) || 0), 0);
+  const totalEl = document.getElementById('member-total-price');
+  if (totalEl) totalEl.textContent = total;
 }
 
 /* ─── Animated counters ───────────────────────────────────────────── */

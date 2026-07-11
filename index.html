@@ -17,10 +17,10 @@
     <div class="header-top">
       <div class="container">
         <div class="social-bar">
-          <a href="https://www.facebook.com/profile.php?id=61555805010547" target="_blank" rel="noopener" aria-label="Facebook">&#9632; Facebook</a>
-          <a href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" aria-label="Discord">&#9632; Discord</a>
-          <a href="https://www.instagram.com/riednrole/" target="_blank" rel="noopener" aria-label="Instagram">&#9632; Instagram</a>
-          <a href="https://www.myludo.fr/#!/profil/ried-role-73114" target="_blank" rel="noopener" aria-label="MyLudo">&#9632; MyLudo</a>
+          <a id="social-facebook" href="https://www.facebook.com/profile.php?id=61555805010547" target="_blank" rel="noopener" aria-label="Facebook">&#9632; Facebook</a>
+          <a id="social-discord" href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" aria-label="Discord">&#9632; Discord</a>
+          <a id="social-instagram" href="https://www.instagram.com/riednrole/" target="_blank" rel="noopener" aria-label="Instagram">&#9632; Instagram</a>
+          <a id="social-myludo" href="https://www.myludo.fr/#!/profil/ried-role-73114" target="_blank" rel="noopener" aria-label="MyLudo">&#9632; MyLudo</a>
         </div>
         <div class="header-right">
           <div class="header-tagline">Association de Jeux de Rôle — Centre Alsace</div>
@@ -33,7 +33,7 @@
         <a href="#home" class="logo" data-target="home">
           <span class="logo-icon">&#9670;</span>
           <div class="logo-text">
-            <span class="logo-name">Ried &amp; Rôle</span>
+            <span class="logo-name js-assoc-name">Ried &amp; Rôle</span>
             <span class="logo-sub">Association de Jeux de Rôle</span>
           </div>
         </a>
@@ -67,7 +67,7 @@
         <div class="hero-particles" id="particles"></div>
         <div class="hero-content">
           <p class="hero-eyebrow">&#9670; Bienvenue dans l'univers de</p>
-          <h1 class="hero-title">Ried <span class="accent">&amp;</span> Rôle</h1>
+          <h1 class="hero-title" id="hero-assoc-name">Ried <span class="accent">&amp;</span> Rôle</h1>
           <p class="hero-subtitle">L'association alsacienne qui vous plonge dans des aventures épiques.<br>Rejoignez-nous autour des tables de jeu !</p>
           <div class="hero-buttons">
             <a href="#jeux" class="btn btn-primary nav-link" data-target="jeux">Découvrir nos jeux</a>
@@ -649,13 +649,13 @@
               <div class="ci-icon">&#128205;</div>
               <div>
                 <h4>Notre local</h4>
-                <p>Rue de Baldenheim<br>67390 Hessenheim<br>France</p>
+                <p id="contact-address">Rue de Baldenheim<br>67390 Hessenheim<br>France</p>
               </div>
             </div>
 
             <!-- Colonne droite ligne 1 : Google Maps -->
             <div class="ci-map">
-              <iframe
+              <iframe id="contact-map"
                 src="https://www.google.com/maps?q=Rue+de+Baldenheim,+67390+Hessenheim,+France&output=embed"
                 width="100%" height="100%" style="border:0;border-radius:8px;display:block;" allowfullscreen=""
                 loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Notre local">
@@ -668,7 +668,7 @@
                 <div class="ci-icon">&#128231;</div>
                 <div>
                   <h4>Contact mail</h4>
-                  <p>ried.and.role@gmail.com<br>Réponse sous 48h</p>
+                  <p><span id="contact-email">ried.and.role@gmail.com</span><br>Réponse sous 48h</p>
                 </div>
               </div>
 
@@ -677,15 +677,15 @@
                 <div>
                   <h4>Discord</h4>
                   <p>Rejoignez notre serveur Discord pour discuter en temps réel avec les membres.</p>
-                  <a href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-top:0.5rem;">Rejoindre le Discord</a>
+                  <a id="contact-discord-link" href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="margin-top:0.5rem;">Rejoindre le Discord</a>
                 </div>
               </div>
 
               <div class="membership-box">
                 <h4>&#9670; Cotisations 2026</h4>
-                <div class="membership-prices">
+                <div class="membership-prices" id="membership-prices-list">
                   <a href="https://www.helloasso.com/associations/espace-enfants-grand-ried/adhesions/adhesion-carte-de-membre-annuelle-eegr" target="_blank" rel="noopener" class="mp-item mp-item-link">
-                    <span class="mp-type">Espace Enfants Grand Ried <small>(Asso Mère)</small></span>
+                    <span class="mp-type">Espace Enfants Grand Ried (Asso Mère)</span>
                     <span class="mp-price">15 €<span>/an</span></span>
                   </a>
                   <a href="https://www.helloasso.com/associations/espace-enfants-grand-ried/adhesions/adhesion-ried-and-role" target="_blank" rel="noopener" class="mp-item mp-item-link">
@@ -693,7 +693,7 @@
                     <span class="mp-price">10 €<span>/an</span></span>
                   </a>
                 </div>
-                <p style="font-size:0.85rem;color:#aaa;margin-top:1rem;">Chaque adhésion se fait séparément et a un coût propre, mais les deux sont obligatoires.<br>Au total, l'adhésion coûte 25 € pour un an de date à date, peu importe quand vous adhérez.</p>
+                <p style="font-size:0.85rem;color:#aaa;margin-top:1rem;">Chaque adhésion est à régler séparément.<br>Au total, l'adhésion revient à <span id="member-total-price">25</span> € pour un an de date à date, peu importe quand vous adhérez.</p>
                 <p style="font-size:0.85rem;color:#aaa;margin-top:0.5rem;">L'adhésion donne accès à toutes nos sessions, événements membres et à l'emprunt de matériel de jeu.</p>
               </div>
             </div>
@@ -755,15 +755,15 @@
             <a href="#home" class="logo nav-link" data-target="home">
               <span class="logo-icon">&#9670;</span>
               <div class="logo-text">
-                <span class="logo-name">Ried &amp; Rôle</span>
+                <span class="logo-name js-assoc-name">Ried &amp; Rôle</span>
                 <span class="logo-sub">Association de Jeux de Rôle</span>
               </div>
             </a>
-            <p>Association fondée en 2024, Ried &amp; Rôle rassemble les passionnés de jeux de rôle du Ried Centre-Alsace autour de tables conviviales et d'aventures mémorables.</p>
+            <p id="footer-description">Association fondée en 2024, Ried &amp; Rôle rassemble les passionnés de jeux de rôle du Ried Centre-Alsace autour de tables conviviales et d'aventures mémorables.</p>
             <div class="footer-social">
-              <a href="https://www.facebook.com/profile.php?id=61555805010547" target="_blank" rel="noopener" aria-label="Facebook">f</a>
-              <a href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" aria-label="Discord">D</a>
-              <a href="https://www.instagram.com/riednrole/" target="_blank" rel="noopener" aria-label="Instagram">&#9632;</a>
+              <a id="footer-facebook" href="https://www.facebook.com/profile.php?id=61555805010547" target="_blank" rel="noopener" aria-label="Facebook">f</a>
+              <a id="footer-discord" href="https://bit.ly/Discord_RiednRole" target="_blank" rel="noopener" aria-label="Discord">D</a>
+              <a id="footer-instagram" href="https://www.instagram.com/riednrole/" target="_blank" rel="noopener" aria-label="Instagram">&#9632;</a>
             </div>
           </div>
           <div class="footer-links">
@@ -780,15 +780,15 @@
           </div>
           <div class="footer-contact">
             <h5>Nous trouver</h5>
-            <p>&#128205; Sous la salle polyvalente<br>Rue de Baldenheim<br>67390 Hessenheim</p>
-            <p>&#128231; ried.and.role@gmail.com</p>
+            <p>&#128205; <span id="footer-address">Sous la salle polyvalente<br>Rue de Baldenheim<br>67390 Hessenheim</span></p>
+            <p>&#128231; <span id="footer-email">ried.and.role@gmail.com</span></p>
           </div>
         </div>
       </div>
     </div>
     <div class="footer-bottom">
       <div class="container">
-        <p>&copy; 2026 Ried &amp; Rôle</p>
+        <p>&copy; 2026 <span class="js-assoc-name">Ried &amp; Rôle</span></p>
         <p>Fait avec &#9829; en Alsace</p>
       </div>
     </div>

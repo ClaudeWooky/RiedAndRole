@@ -1,0 +1,19 @@
+{
+  "nomAssociation": "Nom de votre association",
+  "email": "contact@exemple.fr",
+  "description": "Une phrase de présentation de l'association.",
+  "adresse": "Rue Exemple, 00000 Ville, France",
+  "facebookUrl": "https://www.facebook.com/...",
+  "discordUrl": "https://discord.gg/...",
+  "instagramUrl": "https://www.instagram.com/...",
+  "myludoUrl": "https://www.myludo.fr/...",
+  "cotisations": [
+    { "label": "Nom de la cotisation", "prix": 10, "url": "https://www.helloasso.com/..." }
+  ],
+  "membres": 0,
+  "parties": 0,
+  "evenements": 0,
+  "annees": 0,
+  "milestone1Hours": 168,
+  "milestone2Hours": 24
+}

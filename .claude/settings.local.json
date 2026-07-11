@@ -4,7 +4,9 @@
       "WebFetch(domain:www.boardgamegeek.com)",
       "WebFetch(domain:black-book-editions.fr)",
       "WebFetch(domain:shop.black-book-editions.fr)",
-      "WebFetch(domain:api.black-book-editions.fr)"
+      "WebFetch(domain:api.black-book-editions.fr)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(pkill -f \"node server.js\")"
     ]
   }
 }

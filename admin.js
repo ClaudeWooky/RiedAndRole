@@ -90,6 +90,7 @@ async function initData() {
 ═══════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', async () => {
   await initData();
+  applyBrandingName();
   checkAuth();
   bindLogin();
   bindLogout();
@@ -115,6 +116,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindBackupRestore();
   renderAll();
 });
+
+function applyBrandingName() {
+  const cfg = getSiteConfig();
+  if (!cfg.nomAssociation) return;
+  const set = id => { const el = document.getElementById(id); if (el) el.textContent = cfg.nomAssociation; };
+  set('login-assoc-name');
+  set('sidebar-assoc-name');
+  document.title = document.title.replace('Ried & Rôle', cfg.nomAssociation);
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    SIDEBAR TOGGLE
@@ -2793,12 +2803,27 @@ function cancelBlogEdit() {
 function getSiteConfig() {
   const v = _cache['site'];
   if (v && !Array.isArray(v) && typeof v === 'object') return v;
-  return { membres: 42, parties: 8, evenements: 15, annees: 6, milestone1Hours: 168, milestone2Hours: 24 };
+  return {
+    membres: 42, parties: 8, evenements: 15, annees: 6, milestone1Hours: 168, milestone2Hours: 24,
+    nomAssociation: '', description: '', adresse: '', email: '',
+    facebookUrl: '', discordUrl: '', instagramUrl: '', myludoUrl: '',
+    cotisations: [],
+  };
 }
 
 function renderSite() {
   const cfg = getSiteConfig();
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+  set('site-nom',         cfg.nomAssociation);
+  set('site-email',       cfg.email);
+  set('site-description', cfg.description);
+  set('site-adresse',     cfg.adresse);
+  set('site-facebook',    cfg.facebookUrl);
+  set('site-discord',     cfg.discordUrl);
+  set('site-instagram',   cfg.instagramUrl);
+  set('site-myludo',      cfg.myludoUrl);
+  _cotisationsState = Array.isArray(cfg.cotisations) ? cfg.cotisations.map(c => ({ ...c })) : [];
+  renderCotisationsList();
   set('site-membres',     cfg.membres);
   set('site-parties',     cfg.parties);
   set('site-evenements',  cfg.evenements);
@@ -2975,12 +3000,74 @@ function renderNotifications() {
   }
 }
 
+let _cotisationsState = [];
+
+function syncCotisationsFromDOM() {
+  const container = document.getElementById('cotisations-list');
+  if (!container) return;
+  _cotisationsState = [...container.querySelectorAll('.cotisation-row')].map(row => ({
+    label: row.querySelector('.cotis-label').value.trim(),
+    prix:  parseFloat(row.querySelector('.cotis-prix').value) || 0,
+    url:   row.querySelector('.cotis-url').value.trim(),
+  }));
+}
+
+function renderCotisationsList() {
+  const container = document.getElementById('cotisations-list');
+  if (!container) return;
+  if (!_cotisationsState.length) {
+    container.innerHTML = '<p class="empty-msg">Aucune cotisation.</p>';
+    return;
+  }
+  container.innerHTML = _cotisationsState.map((c, i) => `
+    <div class="cotisation-row" data-idx="${i}">
+      <div class="form-group">
+        <label>Nom</label>
+        <input type="text" class="cotis-label" value="${esc(c.label || '')}" placeholder="Nom de la cotisation" />
+      </div>
+      <div class="form-group">
+        <label>Prix (&euro; / an)</label>
+        <input type="number" class="cotis-prix" min="0" step="0.01" value="${c.prix ?? ''}" />
+      </div>
+      <div class="form-group">
+        <label>URL adhésion</label>
+        <input type="url" class="cotis-url" value="${esc(c.url || '')}" placeholder="https://www.helloasso.com/..." />
+      </div>
+      <button type="button" class="btn-danger-sm btn-remove-cotisation" data-idx="${i}" title="Supprimer">&#x2715;</button>
+    </div>`).join('');
+
+  container.querySelectorAll('.btn-remove-cotisation').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncCotisationsFromDOM();
+      _cotisationsState.splice(Number(btn.dataset.idx), 1);
+      renderCotisationsList();
+    });
+  });
+}
+
 function bindSiteForm() {
   const form = document.getElementById('form-site');
   if (!form) return;
+
+  document.getElementById('btn-add-cotisation')?.addEventListener('click', () => {
+    syncCotisationsFromDOM();
+    _cotisationsState.push({ label: '', prix: 0, url: '' });
+    renderCotisationsList();
+  });
+
   form.addEventListener('submit', e => {
     e.preventDefault();
+    syncCotisationsFromDOM();
     const cfg = {
+      nomAssociation:  document.getElementById('site-nom').value.trim(),
+      email:           document.getElementById('site-email').value.trim(),
+      description:     document.getElementById('site-description').value.trim(),
+      adresse:         document.getElementById('site-adresse').value.trim(),
+      facebookUrl:     document.getElementById('site-facebook').value.trim(),
+      discordUrl:      document.getElementById('site-discord').value.trim(),
+      instagramUrl:    document.getElementById('site-instagram').value.trim(),
+      myludoUrl:       document.getElementById('site-myludo').value.trim(),
+      cotisations:     _cotisationsState,
       membres:         parseInt(document.getElementById('site-membres').value,     10) || 0,
       parties:         parseInt(document.getElementById('site-parties').value,     10) || 0,
       evenements:      parseInt(document.getElementById('site-evenements').value,  10) || 0,
@@ -2989,6 +3076,7 @@ function bindSiteForm() {
       milestone2Hours: parseInt(document.getElementById('site-milestone2').value,  10) || 24,
     };
     _cache['site'] = cfg;
+    applyBrandingName();
     fetch('/data/site.json', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },

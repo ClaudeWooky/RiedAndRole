@@ -4,5 +4,17 @@ config.json
 # Données générées automatiquement
 data/analytics.json
 
+# Paramètres du site — infos réelles de l'association (adresse, mail, cotisations, ...)
+# à conserver uniquement sur le serveur, pas dans le dépôt public
+data/site.json
+
+# Données sensibles / personnelles — comptes admin, mails d'abonnés/inscrits, comptabilité
+data/accounts.json
+data/subscriptions.json
+data/registrations.json
+data/event_notif_subs.json
+data/comptabilite.json
+data/notif_log.json
+
 # Dépendances
 node_modules/

@@ -19,7 +19,7 @@
       <div class="login-logo">
         <span class="logo-icon">&#9670;</span>
         <div>
-          <span class="logo-name">Ried &amp; Rôle</span>
+          <span class="logo-name" id="login-assoc-name">Ried &amp; Rôle</span>
           <span class="logo-sub">Administration</span>
         </div>
       </div>
@@ -48,7 +48,7 @@
       <div class="sidebar-top">
         <a href="index.html" class="admin-logo">
           <span class="logo-icon">&#9670;</span>
-          <span class="nav-label">Ried &amp; Rôle</span>
+          <span class="nav-label" id="sidebar-assoc-name">Ried &amp; Rôle</span>
           <span class="admin-badge nav-label">ADMIN</span>
         </a>
         <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Réduire le menu">&#10094;</button>
@@ -861,13 +861,61 @@
       <!-- ═══════════════  SECTION SITE  ══════════════════════════ -->
       <section id="section-site" class="admin-section">
 
-        <!-- ── Statistiques ── -->
+        <!-- ── Informations de l'association ── -->
         <div class="section-title-bar">
           <h2>&#9881; Paramètres du Site</h2>
-          <p>Ces valeurs apparaissent dans la barre de statistiques de la page d'accueil.</p>
+          <p>Informations générales de l'association, affichées sur les différentes pages du site public.</p>
         </div>
         <div class="site-settings-panel">
           <form id="form-site" novalidate>
+            <div class="site-settings-grid">
+              <div class="form-group">
+                <label for="site-nom">Nom de l'association</label>
+                <input type="text" id="site-nom" placeholder="Ried &amp; Rôle" />
+              </div>
+              <div class="form-group">
+                <label for="site-email">Email de contact</label>
+                <input type="email" id="site-email" placeholder="contact@exemple.fr" />
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:1.25rem;">
+              <label for="site-description">Description</label>
+              <textarea id="site-description" rows="3" placeholder="Association fondée en ... rassemble les passionnés de jeux de rôle..."></textarea>
+            </div>
+            <div class="form-group" style="margin-top:1.25rem;">
+              <label for="site-adresse">Adresse</label>
+              <input type="text" id="site-adresse" placeholder="Rue de Baldenheim, 67390 Hessenheim, France" />
+            </div>
+            <div class="site-settings-grid" style="margin-top:1.25rem;">
+              <div class="form-group">
+                <label for="site-facebook">URL Facebook</label>
+                <input type="url" id="site-facebook" placeholder="https://www.facebook.com/..." />
+              </div>
+              <div class="form-group">
+                <label for="site-discord">URL Discord</label>
+                <input type="url" id="site-discord" placeholder="https://bit.ly/..." />
+              </div>
+              <div class="form-group">
+                <label for="site-instagram">URL Instagram</label>
+                <input type="url" id="site-instagram" placeholder="https://www.instagram.com/..." />
+              </div>
+              <div class="form-group">
+                <label for="site-myludo">URL MyLudo</label>
+                <input type="url" id="site-myludo" placeholder="https://www.myludo.fr/..." />
+              </div>
+            </div>
+
+            <div class="section-title-bar section-title-bar--sub" style="margin-top:2rem;">
+              <h2>&#128176; Cotisations</h2>
+              <p>Affichées dans la page Contacts. Ajoutez, renommez, modifiez le montant ou supprimez une cotisation.</p>
+            </div>
+            <div id="cotisations-list" class="cotisations-list"></div>
+            <button type="button" class="btn btn-outline-sm" id="btn-add-cotisation" style="margin-bottom:1.5rem;">+ Ajouter une cotisation</button>
+
+            <div class="section-title-bar section-title-bar--sub" style="margin-top:2rem;">
+              <h2>&#128202; Statistiques de la page d'accueil</h2>
+              <p>Ces valeurs apparaissent dans la barre de statistiques de la page d'accueil.</p>
+            </div>
             <div class="site-settings-grid">
               <div class="form-group">
                 <label for="site-membres">Nombre de membres</label>

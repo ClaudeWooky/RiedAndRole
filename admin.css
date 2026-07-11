@@ -1494,6 +1494,23 @@ hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 
   margin-bottom: 1.5rem;
 }
 
+.cotisations-list {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+.cotisation-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr auto;
+  gap: .75rem;
+  align-items: end;
+}
+.cotisation-row .form-group { margin-bottom: 0; }
+@media (max-width: 720px) {
+  .cotisation-row { grid-template-columns: 1fr 1fr; }
+}
+
 /* ─── Backup / Restore panel ─────────────────────────────────────── */
 .backup-panel { max-width: 640px; }
 .backup-actions {
