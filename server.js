@@ -575,7 +575,7 @@ async function searchBBE(q) {
           description
           rangeId
           rangeSlug
-          priceFrom
+          priceTTC
         }
       }
     }
@@ -590,11 +590,12 @@ async function searchBBE(q) {
     ));
   } catch(e) { console.error('[BBE] erreur réseau:', e.message); return []; }
 
-  if (gqlStatus !== 200) return [];
+  if (gqlStatus !== 200) { console.error('[BBE] HTTP', gqlStatus); return []; }
 
   let hits;
   try {
     const data = JSON.parse(gqlBody);
+    if (data?.errors?.length) console.error('[BBE] GraphQL:', data.errors[0].message);
     hits = data?.data?.store?.products?.hits;
   } catch { return []; }
 
@@ -605,10 +606,10 @@ async function searchBBE(q) {
     author:      '',
     publisher:   'Black Book Éditions',
     year:        '',
-    cover:       (() => { const c = p.images?.[0]?.sizeS || p.images?.[0]?.default || null; return c ? (c.startsWith('http') ? c : BBE_BASE + c) : null; })(),
+    cover:       (() => { const imgs = p.images || []; const c = (imgs.find(i => i.default === true) || imgs[0])?.sizeS || null; return c ? (c.startsWith('http') ? c : BBE_BASE + c) : null; })(),
     description: (p.description || p.shortDescription || '').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,500),
     url:         p.id && p.nameSlug ? `${BBE_BASE}/produit/${p.id}/0/${p.rangeSlug || 'gamme'}/${p.nameSlug}` : null,
-    price:       p.priceFrom ? `${parseFloat(p.priceFrom).toFixed(2)} €` : null,
+    price:       p.priceTTC ? `${(p.priceTTC / 100).toFixed(2)} €` : null,
     source:      'BBE'
   })).filter(p => p.title);
 }
