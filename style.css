@@ -1293,6 +1293,7 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   font-family: 'Rajdhani', sans-serif;
   z-index: 1100;
 }
+.ins-error-toast { background: #b91c1c; }
 
 .membership-box {
   background: linear-gradient(135deg, var(--bg-card), var(--bg-card2));
@@ -1643,6 +1644,9 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
 .agenda-entry-meta { padding:0 1.5rem; font-size:.88rem; color:var(--text-muted); margin:.25rem 0 0; font-family:'Rajdhani',sans-serif; }
 .agenda-entry-meta.agenda-entry-time::before { content:'🕐 '; }
 .agenda-entry-meta.agenda-entry-location::before { content:'📍 '; }
+.agenda-entry-meta.agenda-entry-assignee::before { content:'👤 '; }
+.agenda-entry-tags { padding:.6rem 1.5rem .3rem; display:flex; gap:.4rem; flex-wrap:wrap; }
+.agenda-entry-tags[hidden] { display:none; }
 .agenda-entry-desc { padding:.75rem 1.5rem 1.5rem; font-size:.9rem; color:var(--text); line-height:1.65; border-top:1px solid var(--border); margin-top:.9rem; }
 .cal-chip { cursor:pointer; transition:opacity .15s; }
 .cal-chip:hover { opacity:.8; }
@@ -1904,6 +1908,10 @@ body { padding-top: calc(var(--header-top) + var(--header-h)); }
   display: flex;
   flex-direction: column;
   transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.wish-card--new {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent), 0 8px 24px rgba(0,0,0,.45);
 }
 .wish-card:hover {
   transform: translateY(-4px);

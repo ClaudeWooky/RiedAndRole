@@ -43,7 +43,8 @@ const KEYS = {
   notif:     'notif_log',
   analytics: 'analytics',
   compta:    'comptabilite',
-  parties:   'parties'
+  parties:   'parties',
+  todo:      'todo'
 };
 
 const BLOG_CATS = {
@@ -108,6 +109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindBlogForm();
   bindLibraryForm();
   bindPartiesForm();
+  bindTodoForm();
   bindStatsForm();
   bindComptaForm();
   bindAgendaForm();
@@ -158,7 +160,7 @@ function checkAuth() {
   if (sessionStorage.getItem(SESSION_KEY) === 'true') {
     showShell();
     const perms = JSON.parse(sessionStorage.getItem(PERMS_KEY) || 'null');
-    applyPermissions(perms || ['evenements','agenda','jeux','wishlist','equipe','blog','bibliotheque','parties','comptabilite','statistiques','site']);
+    applyPermissions(perms || ['evenements','agenda','jeux','wishlist','equipe','blog','bibliotheque','parties','comptabilite','statistiques','todo','site']);
   }
 }
 
@@ -1457,6 +1459,7 @@ function renderAll() {
   renderBlog();
   renderLibrary();
   renderParties();
+  renderTodo();
   renderCompta();
   renderAgenda();
   renderSite();
@@ -1997,7 +2000,9 @@ function _wishlistDeleteItem(id) {
   const name = item ? item.title : '';
   showConfirm(name ? `Supprimer « ${name} » de la wishlist ?` : 'Confirmer la suppression ?', async () => {
     try {
-      await fetch(`/api/wishlist/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const r = await fetch(`/api/wishlist/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      if (r.status === 401 || r.status === 403) { showToast('Session expirée — veuillez vous reconnecter.', true); return; }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       if (String(_wishlistEditId) === String(id)) _wishlistClearEditor();
       await renderWishlist();
       showToast('Article retiré de la wishlist.');
@@ -2021,6 +2026,7 @@ function bindWishlistTagEditor() {
         headers: getAuthHeaders(),
         body: JSON.stringify({ tags })
       });
+      if (r.status === 401 || r.status === 403) { showToast('Session expirée — veuillez vous reconnecter.', true); return; }
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || 'Erreur serveur');
       const idx = _wishlistItems.findIndex(i => String(i.id) === String(_wishlistEditId));
@@ -3552,8 +3558,10 @@ function renderAgenda() {
     return;
   }
 
+  const todos = getData(KEYS.todo);
   list.innerHTML = items.map(item => {
     const timeLabel = _agendaTimeLabel(item);
+    const todo      = item.todoId ? todos.find(t => t.id === item.todoId) : null;
     return `
     <div class="admin-list-item">
       <div class="admin-item-header" style="display:flex;align-items:center;gap:.5rem;">
@@ -3563,7 +3571,9 @@ function renderAgenda() {
       <div class="admin-item-meta">
         &#128197; ${esc(item.date || '')}
         ${timeLabel ? '&nbsp;·&nbsp;&#128336; ' + esc(timeLabel) : ''}
+        ${todo ? `&nbsp;·&nbsp;&#128221; TODO${todo.assignee ? ' — ' + esc(todo.assignee) : ''}` : ''}
       </div>
+      ${todo ? _todoBadgesHtml(todo, { withDate: false }) : ''}
       <div class="admin-item-actions">
         <button class="btn-edit" data-edit="${esc(item.id)}">&#9998; Modifier</button>
         <button class="btn-danger" data-delete="${esc(item.id)}" data-key="${KEYS.agenda}">Supprimer</button>
@@ -4330,5 +4340,243 @@ function bindPartiesForm() {
       showToast('Partie enregistrée !');
     }
     renderParties();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TODO
+═══════════════════════════════════════════════════════════════════ */
+let _editingTodoId = null;
+
+const TODO_TYPES = {
+  'generique': { label: 'Générique',        color: 'badge-slate'  },
+  'commande':  { label: 'Commande',         color: 'badge-orange' },
+  'article':   { label: 'Article à écrire', color: 'badge-purple' },
+  'financement': { label: 'Financement participatif', color: 'badge-cyan' }
+};
+
+/* Status disponibles par type (le premier est la valeur par défaut) → couleur du badge */
+const TODO_STATUS = {
+  'commande': {
+    'A faire':                  'badge-red',
+    'Commande passée':          'badge-blue',
+    'En attente réception':     'badge-amber',
+    'Reçu':                     'badge-green',
+    'Rajouter à Bibliothèque':  'badge-teal'
+  },
+  'financement': {
+    'En attente': 'badge-red',
+    'En cours':   'badge-blue',
+    'Commandé':   'badge-amber',
+    'Reçu':       'badge-green'
+  }
+};
+
+function _todoHasDate(type, status) {
+  return type === 'financement' && status === 'En attente';
+}
+
+/* Synchronise l'entrée d'Agenda liée à une tâche (champ `todoId`).
+   Financement participatif « En attente » avec date → entrée créée / mise à jour ;
+   sinon (ou si `todo` est supprimée : remove=true) → entrée retirée. */
+function _syncTodoAgenda(todo, remove = false) {
+  const agenda   = getData(KEYS.agenda);
+  const existing = agenda.find(a => a.todoId === todo.id);
+  const wanted   = !remove && _todoHasDate(todo.type, todo.status) && todo.date;
+
+  if (!wanted) {
+    if (!existing) return;
+    saveData(KEYS.agenda, agenda.filter(a => a.todoId !== todo.id));
+    logNotification('agenda_deleted', `Agenda : « ${existing.title} » supprimé`, [], '#agenda');
+    renderAgenda();
+    return;
+  }
+
+  const title = `FP: ${todo.nom}`;
+  if (existing) {
+    if (existing.title === title && existing.date === todo.date) { renderAgenda(); return; } // tags/affectation ont pu changer
+    saveData(KEYS.agenda, agenda.map(a => a.todoId === todo.id ? { ...a, title, date: todo.date } : a));
+    logNotification('agenda_modified', `Agenda : « ${title} » modifié`, [`📅 ${todo.date}`], '#agenda');
+  } else {
+    prepend(KEYS.agenda, {
+      id: genId('agenda'), title, date: todo.date, timeStart: '',
+      durationH: 0, durationM: 0, color: AGENDA_COLORS['__autre__'], todoId: todo.id
+    });
+    logNotification('agenda_added', `Agenda : nouvelle entrée « ${title} »`, [`📅 ${todo.date}`], '#agenda');
+  }
+  renderAgenda();
+}
+
+/* Badges type + status d'une tâche (utilisés dans TODO et dans l'Agenda) */
+function _todoBadgesHtml(todo, { withDate = true } = {}) {
+  const type = TODO_TYPES[todo.type] || TODO_TYPES.generique;
+  const statusColor = TODO_STATUS[todo.type]?.[todo.status] || 'badge-gray';
+  const dateSuffix  = withDate && _todoHasDate(todo.type, todo.status) && todo.date ? ` — ${esc(_formatDateTodo(todo.date))}` : '';
+  return `<div class="admin-item-badges">
+    <span class="admin-item-badge ${type.color}">${esc(type.label)}</span>
+    ${TODO_STATUS[todo.type] && todo.status ? `<span class="admin-item-badge ${statusColor}">${esc(todo.status)}${dateSuffix}</span>` : ''}
+  </div>`;
+}
+
+function _formatDateTodo(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return isNaN(d) ? dateStr : d.toLocaleDateString('fr-FR');
+}
+
+/* Remplit la liste « Affectée à » avec les membres du Bureau.
+   `keep` : valeur à conserver même si la personne n'est plus au Bureau. */
+function _fillTodoAssignees(keep) {
+  const sel = document.getElementById('todo-assignee');
+  if (!sel) return;
+  const current = keep !== undefined ? keep : sel.value;
+  const names = getData(KEYS.team).filter(m => m.type === 'bureau').map(m => m.name).filter(Boolean);
+  if (current && !names.includes(current)) names.push(current);
+  sel.innerHTML = '<option value="">— Personne —</option>' +
+    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = current || '';
+}
+
+/* Affiche le Status adapté au type choisi, puis la Date si nécessaire.
+   `keepStatus` : status à sélectionner (sinon on garde l'actuel s'il est valide). */
+function _toggleTodoStatus(keepStatus) {
+  const type     = document.getElementById('todo-type').value;
+  const statuses = TODO_STATUS[type];
+  const sel      = document.getElementById('todo-status');
+  document.getElementById('todo-status-group').style.display = statuses ? '' : 'none';
+  if (statuses) {
+    const wanted = typeof keepStatus === 'string' ? keepStatus : sel.value;
+    const names  = Object.keys(statuses);
+    sel.innerHTML = names.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    sel.value = names.includes(wanted) ? wanted : names[0];
+  } else {
+    sel.innerHTML = '';
+  }
+  _toggleTodoDate();
+}
+
+function _toggleTodoDate() {
+  const show = _todoHasDate(document.getElementById('todo-type').value, document.getElementById('todo-status').value);
+  document.getElementById('todo-date-group').style.display = show ? '' : 'none';
+}
+
+function renderTodo() {
+  const items = getData(KEYS.todo);
+  const list  = document.getElementById('list-todo');
+  const count = document.getElementById('count-todo');
+  if (!list) return;
+  count.textContent = items.length;
+  _fillTodoAssignees();
+
+  if (!items.length) {
+    list.innerHTML = '<p class="admin-empty">Aucune tâche.</p>';
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
+    return `
+    <div class="admin-item">
+      <div class="admin-item-row">
+        <div class="admin-item-info">
+          <div class="admin-item-title">${esc(item.nom)}</div>
+          <div class="admin-item-meta">${item.assignee ? `Affectée à : ${esc(item.assignee)}` : 'Non affectée'}</div>
+          ${_todoBadgesHtml(item)}
+        </div>
+        <div class="admin-item-actions">
+          <button class="btn-edit" data-edit-todo="${esc(item.id)}">Modifier</button>
+          <button class="btn-danger" data-delete-todo="${esc(item.id)}">Supprimer</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.btn-edit[data-edit-todo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = getData(KEYS.todo).find(t => t.id === btn.dataset.editTodo);
+      if (item) _populateTodoForm(item);
+    });
+  });
+
+  list.querySelectorAll('.btn-danger[data-delete-todo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm('Supprimer cette tâche ?')) return;
+      const todo = getData(KEYS.todo).find(t => t.id === btn.dataset.deleteTodo);
+      const arr  = getData(KEYS.todo).filter(t => t.id !== btn.dataset.deleteTodo);
+      saveData(KEYS.todo, arr);
+      if (todo) _syncTodoAgenda(todo, true);
+      if (_editingTodoId === btn.dataset.deleteTodo) _cancelTodoEdit();
+      renderTodo();
+      showToast('Tâche supprimée.');
+    });
+  });
+}
+
+function _populateTodoForm(item) {
+  _editingTodoId = item.id;
+  const form = document.getElementById('form-todo');
+  form.querySelector('[name="nom"]').value = item.nom || '';
+  form.querySelector('[name="type"]').value = TODO_TYPES[item.type] ? item.type : 'generique';
+  form.querySelector('[name="date"]').value = item.date || '';
+  _fillTodoAssignees(item.assignee || '');
+  _toggleTodoStatus(item.status || '');
+  document.getElementById('todo-form-title').textContent = 'Modifier la tâche';
+  document.getElementById('todo-submit-btn').textContent = 'Enregistrer les modifications';
+  document.getElementById('todo-cancel-btn').style.display = '';
+  form.querySelector('[name="nom"]').focus();
+}
+
+function _cancelTodoEdit() {
+  _editingTodoId = null;
+  document.getElementById('form-todo').reset();
+  _fillTodoAssignees('');
+  _toggleTodoStatus();
+  document.getElementById('todo-form-title').textContent = 'Nouvelle tâche';
+  document.getElementById('todo-submit-btn').textContent = '+ Ajouter la tâche';
+  document.getElementById('todo-cancel-btn').style.display = 'none';
+}
+
+function bindTodoForm() {
+  const form = document.getElementById('form-todo');
+  if (!form) return;
+
+  document.getElementById('todo-type').addEventListener('change', () => _toggleTodoStatus());
+  document.getElementById('todo-status').addEventListener('change', _toggleTodoDate);
+  document.getElementById('todo-cancel-btn').addEventListener('click', _cancelTodoEdit);
+  // Rafraîchit la liste du Bureau à chaque ouverture (l'Équipe a pu changer)
+  const navBtn = document.querySelector('.admin-nav-btn[data-section="todo"]');
+  if (navBtn) navBtn.addEventListener('click', () => _fillTodoAssignees());
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const d = collectForm(form);
+    if (!(d.nom || '').trim() || !TODO_TYPES[d.type]) {
+      showToast('Merci de remplir les champs obligatoires (*)', true);
+      return;
+    }
+
+    const statuses = TODO_STATUS[d.type];
+    const status   = statuses ? (statuses[d.status] ? d.status : Object.keys(statuses)[0]) : null;
+    const fields = {
+      nom:      d.nom.trim(),
+      assignee: d.assignee || '',
+      type:     d.type,
+      status,
+      date:     _todoHasDate(d.type, status) ? (d.date || '') : ''
+    };
+
+    if (_editingTodoId) {
+      const todo = { ...getData(KEYS.todo).find(t => t.id === _editingTodoId), ...fields };
+      const arr  = getData(KEYS.todo).map(t => t.id === _editingTodoId ? todo : t);
+      saveData(KEYS.todo, arr);
+      _syncTodoAgenda(todo);
+      _cancelTodoEdit();
+      showToast('Tâche modifiée !');
+    } else {
+      const todo = { id: genId('todo'), createdAt: new Date().toISOString(), ...fields };
+      prepend(KEYS.todo, todo);
+      _syncTodoAgenda(todo);
+      _cancelTodoEdit();
+      showToast('Tâche ajoutée !');
+    }
+    renderTodo();
   });
 }

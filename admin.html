@@ -84,6 +84,9 @@
         <button class="admin-nav-btn" data-section="statistiques">
           <span class="nav-icon">&#128202;</span><span class="nav-label">Statistiques</span>
         </button>
+        <button class="admin-nav-btn" data-section="todo">
+          <span class="nav-icon">&#128221;</span><span class="nav-label">TODO</span>
+        </button>
         <button class="admin-nav-btn" data-section="site">
           <span class="nav-icon">&#9881;</span><span class="nav-label">Site</span>
         </button>
@@ -653,6 +656,72 @@
         </div>
       </section>
 
+      <!-- ═══════════════  SECTION TODO  ════════════════════════════ -->
+      <section id="section-todo" class="admin-section">
+        <div class="section-title-bar">
+          <h2>&#128221; TODO</h2>
+          <p>Tâches à réaliser par les membres du Bureau.</p>
+        </div>
+        <div class="admin-layout">
+
+          <!-- Liste -->
+          <div class="admin-list-panel">
+            <div class="panel-header">
+              <h3>Tâches</h3>
+              <span class="item-count" id="count-todo">0</span>
+            </div>
+            <div id="list-todo" class="admin-list"></div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="admin-form-panel">
+            <h3 class="form-title" id="todo-form-title">Nouvelle tâche</h3>
+            <form id="form-todo" novalidate>
+
+              <div class="form-group">
+                <label>Nom de la tâche *</label>
+                <input type="text" name="nom" placeholder="Ex : Commander le livre de base Pathfinder" required autocomplete="off" />
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Type *</label>
+                  <select name="type" id="todo-type" required>
+                    <option value="generique" selected>Générique</option>
+                    <option value="commande">Commande</option>
+                    <option value="article">Article à écrire</option>
+                    <option value="financement">Financement participatif</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Affectée à</label>
+                  <select name="assignee" id="todo-assignee">
+                    <option value="">— Personne —</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group" id="todo-status-group" style="display:none">
+                <label>Status *</label>
+                <select name="status" id="todo-status"></select>
+              </div>
+
+              <div class="form-group" id="todo-date-group" style="display:none">
+                <label>Date <small>(optionnelle)</small></label>
+                <input type="date" name="date" id="todo-date" />
+              </div>
+
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" id="todo-submit-btn">&#43; Ajouter la tâche</button>
+                <button type="button" class="btn btn-outline btn-cancel-edit" id="todo-cancel-btn" style="display:none">Annuler</button>
+              </div>
+
+            </form>
+          </div>
+
+        </div>
+      </section>
+
       <!-- ═══════════════  SECTION COMPTABILITÉ  ════════════════════ -->
       <section id="section-comptabilite" class="admin-section">
         <div class="section-title-bar">
@@ -1093,6 +1162,10 @@
                     <span>Comptabilité</span>
                   </label>
                   <label class="perm-label">
+                    <input type="checkbox" class="acc-perm-cb" value="todo" />
+                    <span>TODO</span>
+                  </label>
+                  <label class="perm-label">
                     <input type="checkbox" class="acc-perm-cb" value="site" />
                     <span>Site</span>
                   </label>
@@ -1202,6 +1275,7 @@
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="events"        checked> Événements</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="games"         checked> Jeux</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="team"          checked> L'Équipe</label>
+        <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="todo"          checked> TODO</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="notifications" checked> Notifications</label>
         <label class="backup-cb-row"><input type="checkbox" name="backup-item" value="wishlist"      checked> Wishlist</label>
       </div>

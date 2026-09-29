@@ -14,9 +14,9 @@ function escHtml(str) {
 const FR_MONTHS = { Jan:0, 'Fév':1, Mar:2, Avr:3, Mai:4, Jun:5, Jul:6, 'Aoû':7, Sep:8, Oct:9, Nov:10, 'Déc':11 };
 
 /* ─── In-memory data store (populated by loadAllData) ────────────── */
-const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [], library: [], wishlist: [] };
+const _data = { events: [], games: [], team: [], registrations: [], tables: [], blog: [], subscriptions: [], agenda: [], library: [], wishlist: [], todo: [] };
 
-const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda', library:'rr_library', wishlist:'rr_wishlist' };
+const LS_KEYS = { events:'rr_events', games:'rr_games', team:'rr_team', registrations:'rr_registrations', tables:'rr_tables', blog:'rr_blog', subscriptions:'rr_subscriptions', agenda:'rr_agenda', library:'rr_library', wishlist:'rr_wishlist', todo:'rr_todo' };
 
 const BLOG_CATS = {
   'annonce':        { label: 'Annonce',                color: 'blue',   icon: '📢', gradient: 'linear-gradient(135deg,#050b1a,#0e204d)', image: '/assets/blog/annonce.png' },
@@ -1424,7 +1424,8 @@ function buildCalendarDayMap(year, month) {
         dateLabel,
         timeLabel,
         description: ag.description || '',
-        location:    ''
+        location:    '',
+        todo:        ag.todoId ? (_data.todo || []).find(t => t.id === ag.todoId) || null : null
       });
     }
   });
@@ -1537,7 +1538,41 @@ function openAgendaEntry(entry) {
     descEl.hidden = true;
   }
 
+  const assigneeEl = document.getElementById('agenda-entry-assignee');
+  const tagsEl     = document.getElementById('agenda-entry-tags');
+  const todo       = entry.todo;
+  if (assigneeEl) {
+    assigneeEl.textContent = todo?.assignee || '';
+    assigneeEl.hidden = !todo?.assignee;
+  }
+  if (tagsEl) {
+    tagsEl.innerHTML = todo ? _todoTagsHtml(todo) : '';
+    tagsEl.hidden = !todo;
+  }
+
   overlay.removeAttribute('hidden');
+}
+
+/* Tags des entrées d'agenda issues du TODO (mêmes libellés/couleurs que l'admin) */
+const TODO_TYPES = {
+  'generique':   { label: 'Générique',                color: 'slate'  },
+  'commande':    { label: 'Commande',                 color: 'orange' },
+  'article':     { label: 'Article à écrire',         color: 'purple' },
+  'financement': { label: 'Financement participatif', color: 'cyan'   }
+};
+const TODO_STATUS = {
+  'commande': {
+    'A faire': 'red', 'Commande passée': 'blue', 'En attente réception': 'amber',
+    'Reçu': 'green', 'Rajouter à Bibliothèque': 'teal'
+  },
+  'financement': { 'En attente': 'red', 'En cours': 'blue', 'Commandé': 'amber', 'Reçu': 'green' }
+};
+
+function _todoTagsHtml(todo) {
+  const type = TODO_TYPES[todo.type] || TODO_TYPES.generique;
+  const statusColor = TODO_STATUS[todo.type]?.[todo.status];
+  return `<span class="tag tag-${type.color}">${escHtml(type.label)}</span>` +
+    (statusColor ? `<span class="tag tag-${statusColor}">${escHtml(todo.status)}</span>` : '');
 }
 
 function _initAgendaEntryModal() {
@@ -1745,8 +1780,12 @@ function _initWishModal() {
   btnConfirm.addEventListener('click', async () => {
     if (!_selectedItem) return;
     const item = { ..._selectedItem, genre: genreEl.value || _selectedItem.genre || '' };
-    await _addToWishlist(item);
-    closeModal();
+    btnConfirm.disabled = true;   // évite les doubles ajouts
+    try {
+      if (await _addToWishlist(item)) closeModal();
+    } finally {
+      btnConfirm.disabled = false;
+    }
   });
 
   btnManual.addEventListener('click', async () => {
@@ -1761,27 +1800,55 @@ function _initWishModal() {
       cover:     null,
       description: ''
     };
-    await _addToWishlist(item);
-    closeModal();
+    btnManual.disabled = true;
+    try {
+      if (await _addToWishlist(item)) closeModal();
+    } finally {
+      btnManual.disabled = false;
+    }
   });
 }
 
+function _wishToast(msg, isError = false) {
+  const t = document.createElement('div');
+  t.className = 'ins-success-toast' + (isError ? ' ins-error-toast' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+/* Fait défiler jusqu'à la carte ajoutée (en fin de liste) et la met en évidence */
+function _wishHighlight(id) {
+  const card = document.querySelector(`#wishlist-grid .wish-card[data-wish-id="${id}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('wish-card--new');
+  setTimeout(() => card.classList.remove('wish-card--new'), 3000);
+}
+
+/* Retourne true si l'article a été ajouté */
 async function _addToWishlist(item) {
+  let added;
   try {
-    const res = await fetch('/api/wishlist', {
+    const res  = await fetch('/api/wishlist', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(item)
     });
-    const data = await res.json();
-    if (data.ok && data.item) {
-      _data.wishlist = [...(_data.wishlist || []), data.item];
-      _renderWishlist();
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok || !data.item) {
+      _wishToast(`✗ Ajout impossible : ${data.error || 'erreur serveur (' + res.status + ')'}`, true);
+      return false;
     }
+    added = data.item;
+    _data.wishlist = [...(_data.wishlist || []), added];
   } catch {
-    const fallback = { ...item, id: Date.now(), addedAt: new Date().toISOString() };
-    _data.wishlist = [...(_data.wishlist || []), fallback];
+    added = { ...item, id: Date.now(), addedAt: new Date().toISOString() };
+    _data.wishlist = [...(_data.wishlist || []), added];
     try { localStorage.setItem('rr_wishlist', JSON.stringify(_data.wishlist)); } catch {}
-    _renderWishlist();
   }
+  _renderWishlist();
+  _wishToast(`✓ « ${added.title} » ajouté à la wishlist !`);
+  _wishHighlight(added.id);
+  return true;
 }
