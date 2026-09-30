@@ -10,7 +10,8 @@
     "description": "Strata, plongez au coeur de la cité tentaculaire de Spire ! Spire est une ville impossible : délabrée, vertigineuse, malfaisante et misérable, grandiose et vulgaire. Entre ses murs croulants, les cruels seigneurs hauts elfes règnent sur la race opprimée des elfes noirs depuis leurs palais scintillants de glace éternelle, les privant de la moindre parcelle de liberté. Leurs sympathisants se pomponnent et se pavanent au milieu d’une grandeur décrépite ou d’une débauche d’excès. Dans l’obscurité maudite de la ville basse, au sein des hospices faits de bric et de broc, au sein d’églises clandestines vouées à des divinités interdites, les elfes noirs se rassemblent et complotent pour renverser leurs oppresseurs. Vous faites partie de ces elfes noirs, et Spire est votre ville. Qu’allez-vous détruire pour reprendre ce qui vous appartient ? Dix scénarios pour explorer les moindres recoins de la cité Le supplément Strata approfondit l’univers de Spire et contient : Deux nouvelles classes : l’Encromancien, magicien à la prose ampoulée, et l’Agent de l’ombre aux identités mouvantes. Une fournée de nouvelles améliorations telles que le Gazetier rebelle, le Lexicuteur qui traque les mots, et des capacités pour représenter chacune des neuf maisons nobles des drows. Dix scénarios conçus par un large panel d’auteurs pour vous lancer dans une partie en un clin d’oeil. Une revue détaillée des quartiers riches et misérables de Spire. Des armes et des équipements inédits destinés à la Haute Société et au Prolétariat. Une édition française augmentée Cette édition comprend également le supplément Magie Noire comprenant de nouvelles classes et améliorations de personnages (la Sorcière de Sang, le Grangou, l'Apiculteur chtonien et le Démonolgue) ainsi qu'un aperçu de la Magie dans l'univers de Spire",
     "source": "Philibert",
     "url": "https://www.philibertnet.com/fr/spire-le-soulevement/107952-spire-le-soulevement-strata-9782492176050.html",
-    "addedAt": "2026-06-29T09:18:29.675Z"
+    "addedAt": "2026-06-29T09:18:29.675Z",
+    "tags": []
   },
   {
     "id": 1782724739926,
@@ -598,16 +599,29 @@
     "addedAt": "2026-09-29T15:14:31.680Z"
   },
   {
-    "id": 1790695039721,
-    "title": "L'Empire des Cerisiers : Kodaijin Monogatari - Histoire des Peuples Anciens",
-    "author": "",
-    "genre": "jdr",
-    "publisher": "Black Book Éditions",
+    "id": 1790755657232,
+    "title": "Dungeons & Dragons - Les Seigneurs d'Eauprofonde",
+    "author": "Peter Lee, Rodney Thompson",
+    "genre": "jds",
+    "publisher": "Renegade Game Studio",
     "year": "",
-    "cover": "https://img.black-book-editions.fr/06T9StyAnjpjC069cYBeH84V9Zg=/trim/120x/images/products/lempiredescerisierskodaijinmonogatarihistoiredespeuplesanciens_1.png",
-    "description": "Histoire des Peuples Anciens est un suppl&eacute;ment pour le jeu de r&ocirc;le L&#39;Empire des Cerisiers, enti&egrave;rement consacr&eacute; aux peuples autochtones et anciens qui peuplent cet univers d&#39;inspiration japonaise. Ce volume, &eacute;galement connu sous le titre Kodaijin Monogatari, plonge les joueuses et joueurs au c&oelig;ur de cultures riches, m&eacute;connues et souvent oubli&eacute;es, qui habitent les marges et les recoins les plus recul&eacute;s de l&#39;Empire. Voyagez a",
-    "source": "BBE",
-    "url": "https://shop.black-book-editions.fr/produit/134650PHY/0/lempire-des-cerisiers/lempire-des-cerisiers-kodaijin-monogatari-histoire-des-peuples-anciens",
-    "addedAt": "2026-09-29T15:17:19.721Z"
+    "cover": "http://cdn2.philibertnet.com/858125-home_default/dungeons-dragons-lords-of-waterdeep.jpg",
+    "description": "Les Seigneurs d'Eauprofonde , incarnez les seigneurs d'Eauprofonde dans ce jeu d'intrigues et de complots Les Seigneurs d'Eauprofonde est un jeu d'intrigues, de renversements de situation et de complots secrets qui se déroule dans la cité la plus fantastique des Royaumes Oubliés et de Dungeons & Dragons . Les puissants seigneurs de la ville se disputent le contrôle de Eauprofonde, la Cité des Splendeurs. Derrière la façade étincelante des grands immeubles et des rues sinueuses, se trament de sombres intrigues et des transactions louches dans les ruelles, laissant les trésors et les ressources de la ville à la merci des pillards. Dans ce jeu au rythme effréné où la chance tourne sans cesse, vous incarnez un seigneur de Eauprofonde. Grâce à vos agents, vous recrutez des aventuriers et les envoyez en quête afin de gagner des faveurs et d'étendre votre influence à travers la ville. Augmentez votre trésor, achetez des bâtiments, affectez des agents : choisissez judicieusement vos actions et vous deviendrez le seigneur suprême de Eauprofonde !",
+    "source": "Philibert",
+    "url": "https://www.philibertnet.com/fr/renegade-game-studios/173775-dungeons-dragons-lords-of-waterdeep-2100001328405.html",
+    "addedAt": "2026-09-30T08:07:37.232Z"
+  },
+  {
+    "id": 1790755657263,
+    "title": "Dungeons & Dragons - Les Seigneurs D'Eauprofonde : Les Vauriens de Port-crâne",
+    "author": "Peter Lee, Rodney Thompson",
+    "genre": "jds",
+    "publisher": "Renegade Game Studio",
+    "year": "",
+    "cover": "http://cdn2.philibertnet.com/858130-home_default/dungeons-dragons-lords-of-waterdeep-scoundrels-of-skullport.jpg",
+    "description": "Les Vauriens de Port-crâne, deux modules d'extensions pour Les Seigneurs d'Eauprofonde Les Vauriens de Port-crâne ajoute du nouveau contenu pour Les Seigneurs d'Eauprofonde . Il ne s'agit pas d'une, mais de deux extensions complètes : Montprofond et Port-Crâne . Chaque lieu passionnant possède des caractéristiques uniques et offre de nouvelles options de jeu, notamment de nouvelles cartes Seigneurs, Bâtiments, Intrigue et Quête. Les possesseurs des Seigneurs d'Eauprofonde peuvent utiliser l'un ou les deux de ces nouveaux lieux souterrains pour ajouter de la profondeur à leur expérience de jeu. Il y a également une nouvelle faction, les Mains grises, de sorte que maintenant un sixième joueur peut se joindre à l'amusement ! Le module Montprofond Undermountain est un vaste donjon à plusieurs niveaux situé sous le Mont Eauprofonde qui servait autrefois de site d'expériences magiques au sorcier fou Halaster. Aujourd'hui, c'est un labyrinthe labyrinthique avec peu de refuges pour les aventuriers fatigués. La rumeur de la richesse de Montprofond incite les aventuriers à braver les mystères et les monstres sous la Cité des Splendeurs. Les risques et les récompenses sont plus grands pour entreprendre des quêtes qui nécessitent plus d'or et d'aventuriers. Le module Port-Crâne Port-Crâne - également connu sous le nom de Port de l'Ombre - est niché au cœur de la sous-montagne, profondément sous les rues d'Eauprofonde. C'est un refuge pour les crimes infâmes, les transactions sournoises et les meurtres de ruelle. Ceux qui visitent Port-Crâne le font à leurs risques et périls, car à chaque coin de rue se trouvent de nouveaux moyens de faire disparaître les gens. Le module Port-Crâne comprend une nouvelle ressource : la Corruption. Contrairement aux Aventuriers et à l'Or, avoir de la Corruption dans votre taverne vous pénalise à la fin de la partie. Chaque jeton Corruption dans votre taverne à la fin de la partie vaut des points de victoire négatifs. La valeur négative exacte dépe",
+    "source": "Philibert",
+    "url": "https://www.philibertnet.com/fr/renegade-game-studios/173780-dungeons-dragons-lords-of-waterdeep-scoundrels-of-skullport-2100001328443.html",
+    "addedAt": "2026-09-30T08:07:37.263Z"
   }
 ]

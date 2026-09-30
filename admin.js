@@ -1891,15 +1891,46 @@ async function renderWishlist() {
     _wishlistItems = await r.json();
   } catch (_) { _wishlistItems = []; }
 
-  count.textContent = _wishlistItems.length;
-
   if (!_wishlistItems.length) {
+    count.textContent = 0;
     list.innerHTML = '<p class="empty-msg">Aucun article en wishlist.</p>';
     _wishlistClearEditor();
     return;
   }
 
-  list.innerHTML = _wishlistItems.map(item => {
+  const searchEl = document.getElementById('wishlist-search');
+  if (searchEl && !searchEl.dataset.bound) {
+    searchEl.dataset.bound = '1';
+    searchEl.addEventListener('input', _renderWishlistList);
+  }
+  _renderWishlistList();
+}
+
+// Minuscules + sans accents, pour une recherche tolérante (« role » trouve « Rôle »)
+const _wishNorm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+function _renderWishlistList() {
+  const list  = document.getElementById('list-wishlist');
+  const count = document.getElementById('count-wishlist');
+  if (!list) return;
+
+  // Tous les mots saisis doivent apparaître dans l'un des champs de l'article
+  const terms = _wishNorm(document.getElementById('wishlist-search')?.value).split(/\s+/).filter(Boolean);
+  const items = !terms.length ? _wishlistItems : _wishlistItems.filter(item => {
+    const genreLabel = (typeof BOOK_GENRES !== 'undefined' && BOOK_GENRES[item.genre]?.label) || '';
+    const hay = _wishNorm([item.title, item.author, item.publisher, item.genre, genreLabel,
+                           item.source, item.description, ...(item.tags || [])].join(' '));
+    return terms.every(t => hay.includes(t));
+  });
+
+  count.textContent = terms.length ? `${items.length} / ${_wishlistItems.length}` : _wishlistItems.length;
+
+  if (!items.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun article ne correspond à la recherche.</p>';
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
     const TAG_COLOR = { 'Achat approuvé': 'badge-green', 'Arrivée imminente': 'badge-blue' };
     const tagsHtml = (item.tags || []).length
       ? `<div class="admin-item-badges" style="margin-top:.3rem;">${item.tags.map(t => `<span class="admin-item-badge ${TAG_COLOR[t] || 'badge-amber'}">${esc(t)}</span>`).join('')}</div>`
@@ -2371,8 +2402,9 @@ function cancelLibraryEdit() {
   form.querySelector('.btn-cancel-edit')?.remove();
 }
 
-let _lookupAbort   = null;
-let _lookupResults = {};   // source → tableau de résultats
+let _lookupAbort    = null;
+let _lookupResults  = {};         // source → tableau de résultats
+let _lookupSelected = new Set();  // clés "source|idx" cochées pour l'ajout multiple
 
 async function _libraryLookup() {
   const titleEl = document.getElementById('lib-title-input');
@@ -2429,7 +2461,8 @@ const _BBE_SOURCE_LABELS = {
 };
 
 function _openLibLookupPopup(genre) {
-  _lookupResults = {};
+  _lookupResults  = {};
+  _lookupSelected = new Set();
   let overlay = document.getElementById('lib-lookup-popup-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -2442,11 +2475,29 @@ function _openLibLookupPopup(genre) {
           <button type="button" id="lib-lookup-popup-close" class="lib-lookup-popup-close" aria-label="Fermer">&#10005;</button>
         </div>
         <div id="lib-lookup-popup-list" class="lib-lookup-popup-list"></div>
+        <div id="lib-lookup-popup-footer" class="lib-lookup-popup-footer" hidden>
+          <span id="lib-lookup-selected-count" class="lib-lookup-selected-count"></span>
+          <button type="button" id="lib-lookup-clear-selected" class="btn btn-outline-sm">Tout décocher</button>
+          <button type="button" id="lib-lookup-add-selected" class="btn btn-primary">＋ Ajouter la sélection</button>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => {
       if (e.target === overlay || e.target.closest('#lib-lookup-popup-close'))
         _closeLibLookupPopup();
+    });
+    document.getElementById('lib-lookup-add-selected').addEventListener('click', () => {
+      const picked = [..._lookupSelected].map(key => {
+        const sep = key.lastIndexOf('|');
+        return (_lookupResults[key.slice(0, sep)] || [])[parseInt(key.slice(sep + 1), 10)];
+      }).filter(Boolean);
+      if (picked.length && _addLibraryLookupResults(picked)) _closeLibLookupPopup();
+    });
+    document.getElementById('lib-lookup-clear-selected').addEventListener('click', () => {
+      _lookupSelected.clear();
+      overlay.querySelectorAll('.lib-lookup-card-check input').forEach(cb => { cb.checked = false; });
+      overlay.querySelectorAll('.lib-lookup-card.is-selected').forEach(c => c.classList.remove('is-selected'));
+      _updateLibLookupFooter();
     });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && overlay && !overlay.hidden) _closeLibLookupPopup();
@@ -2455,6 +2506,7 @@ function _openLibLookupPopup(genre) {
 
   overlay.hidden = false;
   document.body.style.overflow = 'hidden';
+  _updateLibLookupFooter();
 
   const byGenre = _LIB_GENRE_SOURCES[genre] || [];
   const checked = [...document.querySelectorAll('#lib-sources-group input[name="src"]:checked')].map(cb => cb.value);
@@ -2497,10 +2549,12 @@ function _updateLibLookupSource(source, results) {
     return;
   }
 
+  // En mode modification, un seul résultat peut remplacer l'ouvrage : pas de sélection multiple
+  const multi = !editingLibraryId;
   section.querySelector('.lib-lookup-source-results').innerHTML = results.map((r, i) => {
-    const hasUrl = !!(r.url || r.title);
     return `
     <div class="lib-lookup-card" data-idx="${i}" tabindex="0" role="link" aria-label="${esc(r.title)}">
+      ${multi ? `<label class="lib-lookup-card-check" title="Sélectionner pour un ajout groupé"><input type="checkbox" data-idx="${i}"></label>` : ''}
       <div class="lib-lookup-card-cover">
         ${r.cover
           ? `<img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span>📚</span>'">`
@@ -2523,16 +2577,27 @@ function _updateLibLookupSource(source, results) {
       return (_lookupResults[src] || [])[parseInt(el.dataset.idx, 10)];
     };
 
+    // Case à cocher → sélection pour ajout groupé
+    const cb = el.querySelector('.lib-lookup-card-check input');
+    if (cb) {
+      cb.addEventListener('change', () => {
+        const key = `${source}|${el.dataset.idx}`;
+        if (cb.checked) _lookupSelected.add(key); else _lookupSelected.delete(key);
+        el.classList.toggle('is-selected', cb.checked);
+        _updateLibLookupFooter();
+      });
+    }
+
     // Clic sur la carte → ouvre l'URL dans un nouvel onglet
     el.addEventListener('click', e => {
-      if (e.target.closest('.lib-lookup-card-add')) return;
+      if (e.target.closest('.lib-lookup-card-add, .lib-lookup-card-check')) return;
       const r = getResult();
       if (!r) return;
       const url = r.url || _libFallbackUrl(r);
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
     });
     el.addEventListener('keydown', e => {
-      if (e.target.closest('.lib-lookup-card-add')) return;
+      if (e.target.closest('.lib-lookup-card-add, .lib-lookup-card-check')) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const r = getResult();
@@ -2548,6 +2613,15 @@ function _updateLibLookupSource(source, results) {
       if (r) { _applyLibraryLookupResult(r); _closeLibLookupPopup(); }
     });
   });
+}
+
+function _updateLibLookupFooter() {
+  const footer = document.getElementById('lib-lookup-popup-footer');
+  if (!footer) return;
+  const n = _lookupSelected.size;
+  footer.hidden = n === 0;
+  document.getElementById('lib-lookup-selected-count').textContent =
+    `${n} ouvrage${n > 1 ? 's' : ''} sélectionné${n > 1 ? 's' : ''}`;
 }
 
 function _closeLibLookupPopup() {
@@ -2585,26 +2659,48 @@ function _applyLibraryLookupResult(r) {
       cancelLibraryEdit();
     }
   } else {
-    prepend(KEYS.library, {
-      id:          genId('book'),
-      title:       r.title       || '',
-      author:      r.author      || '',
-      genre,
-      system:      r.system      || '',
-      publisher:   r.publisher   || '',
-      year:        r.year        || '',
-      description: r.description || '',
-      rating:      0,
-      cover:       r.cover       || null,
-      price:       r.price       || '',
-      tags:        r.tags        || [],
-      source:      r.source      || '',
-    });
+    prepend(KEYS.library, _libItemFromResult(r, genre));
     showToast('Ouvrage ajouté !');
     const titleEl = document.getElementById('lib-title-input');
     if (titleEl) titleEl.value = '';
   }
   renderLibrary();
+}
+
+function _libItemFromResult(r, genre) {
+  return {
+    id:          genId('book'),
+    title:       r.title       || '',
+    author:      r.author      || '',
+    genre,
+    system:      r.system      || '',
+    publisher:   r.publisher   || '',
+    year:        r.year        || '',
+    description: r.description || '',
+    rating:      0,
+    cover:       r.cover       || null,
+    price:       r.price       || '',
+    tags:        r.tags        || [],
+    source:      r.source      || '',
+  };
+}
+
+/* Ajout groupé des résultats cochés — retourne true si l'ajout a eu lieu */
+function _addLibraryLookupResults(results) {
+  const genreEl = document.querySelector('#form-library [name="genre"]');
+  const genre   = genreEl ? genreEl.value : '';
+  if (!genre) { showToast('Choisissez d\'abord un genre.', true); return false; }
+
+  // Une seule sauvegarde pour tout le lot ; l'ordre de sélection est conservé en tête de liste
+  const items = getData(KEYS.library);
+  items.unshift(...results.map(r => _libItemFromResult(r, genre)));
+  saveData(KEYS.library, items);
+
+  showToast(`${results.length} ouvrage${results.length > 1 ? 's' : ''} ajouté${results.length > 1 ? 's' : ''} !`);
+  const titleEl = document.getElementById('lib-title-input');
+  if (titleEl) titleEl.value = '';
+  renderLibrary();
+  return true;
 }
 
 const _LIB_SOURCE_DEFS = {

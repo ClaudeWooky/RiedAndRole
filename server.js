@@ -1626,8 +1626,11 @@ const server = http.createServer(async (req, res) => {
         const wishFile = path.join(DATA, 'wishlist.json');
         let items = [];
         try { items = JSON.parse(fs.readFileSync(wishFile, 'utf8')); } catch {}
+        // ajouts groupés rapprochés : garantir un id unique même dans la même milliseconde
+        let id = Date.now();
+        while (items.some(w => w.id === id)) id++;
         const item = {
-          id:          Date.now(),
+          id,
           title,
           author:      String(body.author      || '').trim().slice(0, 200),
           genre:       String(body.genre       || '').trim().slice(0, 50),

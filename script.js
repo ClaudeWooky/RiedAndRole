@@ -1636,6 +1636,7 @@ function _renderWishlist() {
         <h3>${escHtml(w.title)}</h3>
         ${w.author    ? `<p class="wish-author">${escHtml(w.author)}</p>` : ''}
         ${w.publisher ? `<p class="wish-publisher">${escHtml(w.publisher)}</p>` : ''}
+        ${w.description ? `<p class="wish-desc" title="${escHtml(w.description)}">${escHtml(w.description)}</p>` : ''}
         ${tagsHtml}
       </div>
     </div>`;
@@ -1662,18 +1663,57 @@ function _initWishModal() {
   const manualTitle  = document.getElementById('wish-manual-title');
   const manualAuthor = document.getElementById('wish-manual-author');
   const manualPub    = document.getElementById('wish-manual-publisher');
+  const manualCover  = document.getElementById('wish-manual-cover');
+  const manualCoverPreview = document.getElementById('wish-manual-cover-preview');
+  const manualDesc   = document.getElementById('wish-manual-desc');
   const btnManual    = document.getElementById('btn-wish-manual-add');
+  const multiBar     = document.getElementById('wish-multi-bar');
+  const multiCount   = document.getElementById('wish-multi-count');
+  const btnAddSelected = document.getElementById('btn-wish-add-selected');
 
   let _selectedItem = null;
+  let _results      = [];         // derniers résultats de recherche
+  const _checked    = new Set();  // index des résultats cochés pour l'ajout groupé
+
+  function _updateMultiBar() {
+    const n = _checked.size;
+    multiBar.style.display = n ? '' : 'none';
+    multiCount.textContent = `${n} article${n > 1 ? 's' : ''} sélectionné${n > 1 ? 's' : ''}`;
+  }
+
+  // pas de quotes/parenthèses : l'URL est injectée dans un background-image:url('…')
+  const _isHttpUrl = s => /^https?:\/\/[^\s'"()<>]+$/i.test(s);
+
+  manualCover.addEventListener('input', () => {
+    const url = manualCover.value.trim();
+    if (_isHttpUrl(url)) {
+      manualCoverPreview.src = url;
+      manualCoverPreview.style.display = '';
+    } else {
+      manualCoverPreview.removeAttribute('src');
+      manualCoverPreview.style.display = 'none';
+    }
+  });
+  manualCoverPreview.addEventListener('error', () => { manualCoverPreview.style.display = 'none'; });
 
   function openModal() {
     genreEl.value   = '';
     titleInput.value = '';
+    manualTitle.value  = '';
+    manualAuthor.value = '';
+    manualPub.value    = '';
+    manualCover.value  = '';
+    manualDesc.value   = '';
+    manualCoverPreview.removeAttribute('src');
+    manualCoverPreview.style.display = 'none';
     resultsArea.style.display    = 'none';
     selectedArea.style.display   = 'none';
     manualArea.style.display     = '';
     resultsList.innerHTML        = '';
     _selectedItem                = null;
+    _results                     = [];
+    _checked.clear();
+    _updateMultiBar();
     overlay.style.display        = 'flex';
     document.body.style.overflow = 'hidden';
   }
@@ -1705,8 +1745,11 @@ function _initWishModal() {
     resultsList.innerHTML = '<div class="wish-searching">Recherche en cours…</div>';
     resultsArea.style.display  = '';
     selectedArea.style.display = 'none';
+    _checked.clear();
+    _updateMultiBar();
 
     const allResults = [];
+    _results = allResults;
     await Promise.all(sources.map(async src => {
       try {
         const res  = await fetch(`/api/wishlist-lookup?source=${encodeURIComponent(src)}&q=${encodeURIComponent(q)}`);
@@ -1727,6 +1770,7 @@ function _initWishModal() {
       const linkIcon = r.url ? `<a class="wrc-link-btn" href="${escHtml(r.url)}" target="_blank" rel="noopener noreferrer" title="Ouvrir la page" aria-label="Ouvrir dans un nouvel onglet">↗</a>` : '';
       return `
       <div class="wish-result-card${r.url ? ' wrc-has-link' : ''}" data-idx="${i}"${urlAttr}>
+        <label class="wrc-check" title="Sélectionner pour un ajout groupé"><input type="checkbox" data-idx="${i}"></label>
         ${cover}
         <div class="wrc-info">
           <strong>${escHtml(r.title)}</strong>
@@ -1748,9 +1792,18 @@ function _initWishModal() {
       });
     });
 
+    resultsList.querySelectorAll('.wrc-check input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const idx = parseInt(cb.dataset.idx, 10);
+        if (cb.checked) _checked.add(idx); else _checked.delete(idx);
+        cb.closest('.wish-result-card').classList.toggle('wrc-checked', cb.checked);
+        _updateMultiBar();
+      });
+    });
+
     resultsList.querySelectorAll('.wish-result-card.wrc-has-link').forEach(card => {
       card.addEventListener('click', e => {
-        if (e.target.closest('.wrc-select-btn') || e.target.closest('.wrc-link-btn')) return;
+        if (e.target.closest('.wrc-select-btn') || e.target.closest('.wrc-link-btn') || e.target.closest('.wrc-check')) return;
         window.open(card.dataset.url, '_blank', 'noopener,noreferrer');
       });
     });
@@ -1788,17 +1841,36 @@ function _initWishModal() {
     }
   });
 
+  btnAddSelected.addEventListener('click', async () => {
+    const picked = [..._checked].sort((a, b) => a - b).map(i => _results[i]).filter(Boolean);
+    if (!picked.length) return;
+    btnAddSelected.disabled = true;
+    try {
+      const genre = genreEl.value;
+      const items = picked.map(r => ({ ...r, genre: genre || r.genre || '' }));
+      if (await _addManyToWishlist(items)) closeModal();
+    } finally {
+      btnAddSelected.disabled = false;
+    }
+  });
+
   btnManual.addEventListener('click', async () => {
     const title = manualTitle.value.trim();
     if (!title) { manualTitle.focus(); return; }
+    const coverUrl = manualCover.value.trim();
+    if (coverUrl && !_isHttpUrl(coverUrl)) {
+      _wishToast('✗ URL d\'image invalide (http:// ou https://, sans espaces ni guillemets)', true);
+      manualCover.focus();
+      return;
+    }
     const item = {
       title,
       author:    manualAuthor.value.trim(),
       publisher: manualPub.value.trim(),
       genre:     genreEl.value || '',
       source:    '',
-      cover:     null,
-      description: ''
+      cover:     coverUrl || null,
+      description: manualDesc.value.trim()
     };
     btnManual.disabled = true;
     try {
@@ -1826,9 +1898,8 @@ function _wishHighlight(id) {
   setTimeout(() => card.classList.remove('wish-card--new'), 3000);
 }
 
-/* Retourne true si l'article a été ajouté */
-async function _addToWishlist(item) {
-  let added;
+/* Enregistre un article (serveur, sinon localStorage) — retourne l'article ajouté ou { error } */
+async function _postWish(item) {
   try {
     const res  = await fetch('/api/wishlist', {
       method:  'POST',
@@ -1836,19 +1907,45 @@ async function _addToWishlist(item) {
       body:    JSON.stringify(item)
     });
     const data = await res.json().catch(() => ({}));
-    if (!data.ok || !data.item) {
-      _wishToast(`✗ Ajout impossible : ${data.error || 'erreur serveur (' + res.status + ')'}`, true);
-      return false;
-    }
-    added = data.item;
-    _data.wishlist = [...(_data.wishlist || []), added];
+    if (!data.ok || !data.item) return { error: data.error || 'erreur serveur (' + res.status + ')' };
+    _data.wishlist = [...(_data.wishlist || []), data.item];
+    return data.item;
   } catch {
-    added = { ...item, id: Date.now(), addedAt: new Date().toISOString() };
+    const added = { ...item, id: Date.now() + Math.floor(Math.random() * 1000), addedAt: new Date().toISOString() };
     _data.wishlist = [...(_data.wishlist || []), added];
     try { localStorage.setItem('rr_wishlist', JSON.stringify(_data.wishlist)); } catch {}
+    return added;
+  }
+}
+
+/* Retourne true si l'article a été ajouté */
+async function _addToWishlist(item) {
+  const added = await _postWish(item);
+  if (added.error) {
+    _wishToast(`✗ Ajout impossible : ${added.error}`, true);
+    return false;
   }
   _renderWishlist();
   _wishToast(`✓ « ${added.title} » ajouté à la wishlist !`);
   _wishHighlight(added.id);
   return true;
+}
+
+/* Ajout groupé — envois séquentiels (le serveur réécrit le fichier à chaque ajout).
+   Retourne true si au moins un article a été ajouté. */
+async function _addManyToWishlist(items) {
+  const added = [];
+  let failed  = 0, lastError = '';
+  for (const item of items) {
+    const res = await _postWish(item);
+    if (res.error) { failed++; lastError = res.error; } else added.push(res);
+  }
+  _renderWishlist();
+  if (added.length) {
+    _wishToast(`✓ ${added.length} article${added.length > 1 ? 's' : ''} ajouté${added.length > 1 ? 's' : ''} à la wishlist${failed ? ` (${failed} en échec)` : ''} !`, failed > 0);
+    _wishHighlight(added[added.length - 1].id);
+  } else {
+    _wishToast(`✗ Ajout impossible : ${lastError}`, true);
+  }
+  return added.length > 0;
 }

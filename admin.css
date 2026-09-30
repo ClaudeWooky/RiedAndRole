@@ -815,6 +815,17 @@ hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 
 }
 .admin-item:hover { border-color: var(--accent); }
 .wishlist-item { align-items: center; }
+.wishlist-search-bar { padding: .6rem 1rem; border-bottom: 1px solid var(--border); }
+.wishlist-search-bar input {
+  width: 100%;
+  padding: .5rem .75rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .88rem;
+}
+.wishlist-search-bar input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
 .wishlist-thumb { width:52px;height:52px;object-fit:cover;border-radius:3px;flex-shrink:0;border:1px solid var(--border); }
 .wishlist-thumb-empty { width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border:1px solid var(--border);border-radius:3px;font-size:1.4rem;flex-shrink:0; }
 .wishlist-link { font-size:.78rem;color:var(--accent);text-decoration:none;margin-top:.25rem;display:inline-block; }
@@ -1208,6 +1219,42 @@ hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 
   justify-content: center;
   transition: background .15s, border-color .15s;
   margin-left: .5rem;
+}
+.lib-lookup-card.is-selected {
+  border-color: #e8a020;
+  background: #1a2640;
+}
+.lib-lookup-card-check {
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  padding: .35rem;
+  margin: -.35rem 0 -.35rem -.35rem;
+  cursor: pointer;
+}
+.lib-lookup-card-check input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #e8a020;
+  cursor: pointer;
+}
+.lib-lookup-popup-footer {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1.25rem;
+  border-top: 1px solid #1a2535;
+  background: #0b101c;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.lib-lookup-popup-footer[hidden] { display: none; }
+.lib-lookup-selected-count {
+  flex: 1;
+  color: #e8a020;
+  font-weight: 700;
+  font-size: .9rem;
 }
 .lib-lookup-card-add:hover {
   background: #e8a020;
