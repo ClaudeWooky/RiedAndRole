@@ -673,6 +673,19 @@
               <h3>Tâches</h3>
               <span class="item-count" id="count-todo">0</span>
             </div>
+            <div class="todo-filter-bar" id="todo-filter-bar">
+              <input type="search" id="todo-filter-text" placeholder="&#128269; Rechercher un titre…" autocomplete="off" aria-label="Rechercher par titre" />
+              <select id="todo-filter-assignee" aria-label="Filtrer par personne affectée">
+                <option value="">Toutes les personnes</option>
+              </select>
+              <select id="todo-filter-type" aria-label="Filtrer par type">
+                <option value="">Tous les types</option>
+              </select>
+              <select id="todo-filter-status" aria-label="Filtrer par status" style="display:none">
+                <option value="">Tous les status</option>
+              </select>
+              <button type="button" id="todo-filter-reset" class="btn btn-outline-sm" style="display:none">&#10005; Réinitialiser</button>
+            </div>
             <div id="list-todo" class="admin-list"></div>
           </div>
 
@@ -712,6 +725,11 @@
               <div class="form-group" id="todo-date-group" style="display:none">
                 <label>Date <small>(optionnelle)</small></label>
                 <input type="date" name="date" id="todo-date" />
+              </div>
+
+              <div class="form-group" id="todo-url-group" style="display:none">
+                <label>Lien du financement <small>(optionnel)</small></label>
+                <input type="url" name="url" id="todo-url" placeholder="https://www.kickstarter.com/projects/…" autocomplete="off" />
               </div>
 
               <div style="display:flex;gap:.6rem;flex-wrap:wrap;">

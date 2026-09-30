@@ -830,6 +830,29 @@ hr.form-sep { border: none; border-top: 1px solid var(--border); margin: 1.2rem 
 .wishlist-thumb-empty { width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#1a1a2e;border:1px solid var(--border);border-radius:3px;font-size:1.4rem;flex-shrink:0; }
 .wishlist-link { font-size:.78rem;color:var(--accent);text-decoration:none;margin-top:.25rem;display:inline-block; }
 .wishlist-link:hover { text-decoration:underline; }
+.todo-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.todo-filter-bar input,
+.todo-filter-bar select {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: .45rem .65rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .85rem;
+}
+.todo-filter-bar input { flex-basis: 100%; }
+.todo-filter-bar input:focus,
+.todo-filter-bar select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+.todo-link {font-size:.78rem;color:var(--accent);text-decoration:none;margin-top:.35rem;display:inline-block; }
+.todo-link:hover { text-decoration:underline; }
 
 .admin-item-info { flex: 1; min-width: 0; }
 .admin-item-title {

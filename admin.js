@@ -1907,7 +1907,7 @@ async function renderWishlist() {
 }
 
 // Minuscules + sans accents, pour une recherche tolérante (« role » trouve « Rôle »)
-const _wishNorm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const _normSearch = s => String(s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 function _renderWishlistList() {
   const list  = document.getElementById('list-wishlist');
@@ -1915,10 +1915,10 @@ function _renderWishlistList() {
   if (!list) return;
 
   // Tous les mots saisis doivent apparaître dans l'un des champs de l'article
-  const terms = _wishNorm(document.getElementById('wishlist-search')?.value).split(/\s+/).filter(Boolean);
+  const terms = _normSearch(document.getElementById('wishlist-search')?.value).split(/\s+/).filter(Boolean);
   const items = !terms.length ? _wishlistItems : _wishlistItems.filter(item => {
     const genreLabel = (typeof BOOK_GENRES !== 'undefined' && BOOK_GENRES[item.genre]?.label) || '';
-    const hay = _wishNorm([item.title, item.author, item.publisher, item.genre, genreLabel,
+    const hay = _normSearch([item.title, item.author, item.publisher, item.genre, genreLabel,
                            item.source, item.description, ...(item.tags || [])].join(' '));
     return terms.every(t => hay.includes(t));
   });
@@ -4551,20 +4551,109 @@ function _toggleTodoStatus(keepStatus) {
 }
 
 function _toggleTodoDate() {
-  const show = _todoHasDate(document.getElementById('todo-type').value, document.getElementById('todo-status').value);
+  const type = document.getElementById('todo-type').value;
+  const show = _todoHasDate(type, document.getElementById('todo-status').value);
   document.getElementById('todo-date-group').style.display = show ? '' : 'none';
+  document.getElementById('todo-url-group').style.display  = _todoHasUrl(type) ? '' : 'none';
+}
+
+function _todoHasUrl(type) {
+  return type === 'financement';
+}
+
+const _isTodoUrl = s => /^https?:\/\/\S+$/i.test(s);
+
+/* ─── Filtres de la liste TODO ─── */
+const _TODO_UNASSIGNED = '__none__';
+
+function _setOptions(sel, firstLabel, options) {
+  const current = sel.value;
+  sel.innerHTML = `<option value="">${esc(firstLabel)}</option>` +
+    options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  sel.value = options.some(([v]) => v === current) ? current : '';
+}
+
+/* (Re)construit les listes des filtres ; conserve les choix encore valides */
+function _fillTodoFilters() {
+  const assSel  = document.getElementById('todo-filter-assignee');
+  const typeSel = document.getElementById('todo-filter-type');
+  if (!assSel || !typeSel) return;
+
+  const names = [...new Set(getData(KEYS.todo).map(t => t.assignee).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+  _setOptions(assSel, 'Toutes les personnes',
+    [[_TODO_UNASSIGNED, '— Non affectée —'], ...names.map(n => [n, n])]);
+  _setOptions(typeSel, 'Tous les types', Object.entries(TODO_TYPES).map(([k, t]) => [k, t.label]));
+  _toggleTodoFilterStatus();
+}
+
+/* Le filtre Status n'existe que pour les types qui ont des status (Commande, Financement) */
+function _toggleTodoFilterStatus() {
+  const type     = document.getElementById('todo-filter-type').value;
+  const statusEl = document.getElementById('todo-filter-status');
+  const statuses = TODO_STATUS[type];
+  statusEl.style.display = statuses ? '' : 'none';
+  _setOptions(statusEl, 'Tous les status', statuses ? Object.keys(statuses).map(s => [s, s]) : []);
+}
+
+function _todoFilterValues() {
+  return {
+    text:     _normSearch(document.getElementById('todo-filter-text')?.value).split(/\s+/).filter(Boolean),
+    assignee: document.getElementById('todo-filter-assignee')?.value || '',
+    type:     document.getElementById('todo-filter-type')?.value || '',
+    status:   document.getElementById('todo-filter-status')?.value || ''
+  };
+}
+
+function _todoMatches(item, f) {
+  if (f.text.length && !f.text.every(t => _normSearch(item.nom).includes(t))) return false;
+  if (f.assignee === _TODO_UNASSIGNED ? item.assignee : (f.assignee && item.assignee !== f.assignee)) return false;
+  if (f.type && item.type !== f.type) return false;
+  if (f.status && item.status !== f.status) return false;
+  return true;
+}
+
+function bindTodoFilters() {
+  const bar = document.getElementById('todo-filter-bar');
+  if (!bar || bar.dataset.bound) return;
+  bar.dataset.bound = '1';
+  document.getElementById('todo-filter-text').addEventListener('input', renderTodo);
+  document.getElementById('todo-filter-assignee').addEventListener('change', renderTodo);
+  document.getElementById('todo-filter-status').addEventListener('change', renderTodo);
+  document.getElementById('todo-filter-type').addEventListener('change', () => {
+    _toggleTodoFilterStatus();
+    renderTodo();
+  });
+  document.getElementById('todo-filter-reset').addEventListener('click', () => {
+    document.getElementById('todo-filter-text').value = '';
+    ['todo-filter-assignee', 'todo-filter-type', 'todo-filter-status']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    _toggleTodoFilterStatus();
+    renderTodo();
+  });
 }
 
 function renderTodo() {
-  const items = getData(KEYS.todo);
+  const all   = getData(KEYS.todo);
   const list  = document.getElementById('list-todo');
   const count = document.getElementById('count-todo');
   if (!list) return;
-  count.textContent = items.length;
   _fillTodoAssignees();
+  bindTodoFilters();
+  _fillTodoFilters();
 
-  if (!items.length) {
+  const f = _todoFilterValues();
+  const filtering = !!(f.text.length || f.assignee || f.type || f.status);
+  const items = filtering ? all.filter(item => _todoMatches(item, f)) : all;
+  count.textContent = filtering ? `${items.length} / ${all.length}` : all.length;
+  document.getElementById('todo-filter-reset').style.display = filtering ? '' : 'none';
+
+  if (!all.length) {
     list.innerHTML = '<p class="admin-empty">Aucune tâche.</p>';
+    return;
+  }
+  if (!items.length) {
+    list.innerHTML = '<p class="admin-empty">Aucune tâche ne correspond aux critères.</p>';
     return;
   }
 
@@ -4576,6 +4665,8 @@ function renderTodo() {
           <div class="admin-item-title">${esc(item.nom)}</div>
           <div class="admin-item-meta">${item.assignee ? `Affectée à : ${esc(item.assignee)}` : 'Non affectée'}</div>
           ${_todoBadgesHtml(item)}
+          ${_todoHasUrl(item.type) && item.url && _isTodoUrl(item.url)
+            ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="todo-link">&#128279; Voir le financement</a>` : ''}
         </div>
         <div class="admin-item-actions">
           <button class="btn-edit" data-edit-todo="${esc(item.id)}">Modifier</button>
@@ -4612,6 +4703,7 @@ function _populateTodoForm(item) {
   form.querySelector('[name="nom"]').value = item.nom || '';
   form.querySelector('[name="type"]').value = TODO_TYPES[item.type] ? item.type : 'generique';
   form.querySelector('[name="date"]').value = item.date || '';
+  form.querySelector('[name="url"]').value  = item.url  || '';
   _fillTodoAssignees(item.assignee || '');
   _toggleTodoStatus(item.status || '');
   document.getElementById('todo-form-title').textContent = 'Modifier la tâche';
@@ -4649,6 +4741,13 @@ function bindTodoForm() {
       return;
     }
 
+    const url = _todoHasUrl(d.type) ? (d.url || '').trim() : '';
+    if (url && !_isTodoUrl(url)) {
+      showToast('Le lien doit commencer par http:// ou https://', true);
+      form.querySelector('[name="url"]').focus();
+      return;
+    }
+
     const statuses = TODO_STATUS[d.type];
     const status   = statuses ? (statuses[d.status] ? d.status : Object.keys(statuses)[0]) : null;
     const fields = {
@@ -4656,7 +4755,8 @@ function bindTodoForm() {
       assignee: d.assignee || '',
       type:     d.type,
       status,
-      date:     _todoHasDate(d.type, status) ? (d.date || '') : ''
+      date:     _todoHasDate(d.type, status) ? (d.date || '') : '',
+      url
     };
 
     if (_editingTodoId) {
